@@ -1,0 +1,41 @@
+{
+  "name": "study-buddy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx server/database/migrate.mts",
+    "create-admin": "tsx scripts/create-admin.mts"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.131",
+    "@iconify-json/simple-icons": "^1.2.95",
+    "@nuxt/ui": "^4.11.1",
+    "better-sqlite3": "^11.10.0",
+    "drizzle-orm": "^0.44.5",
+    "nuxt": "^4.5.2",
+    "nuxt-auth-utils": "^0.5.20",
+    "sharp": "^0.34.4",
+    "tailwindcss": "^4.3.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.17.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "drizzle-kit": "^0.31.5",
+    "eslint": "^10.10.0",
+    "eslint-plugin-better-tailwindcss": "^4.7.0",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.11"
+  },
+  "overrides": {
+    "h3": "1.15.11"
+  }
+}
