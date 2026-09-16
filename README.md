@@ -33,7 +33,40 @@ npm run create-admin -- --username dad --password "your-password" --name "Dad"
 
 Re-run with `--reset` to change an existing admin's password.
 
-## Production
+## Deployment (Kamal)
+
+The app ships with a `Dockerfile` and `config/deploy.yml` for deploying with
+[Kamal](https://kamal-deploy.org/). It deploys to `study-buddy.spinorml.com`, sharing the same
+host and `kamal-proxy` as the spinorml/teenygrad sites; TLS is terminated at Cloudflare in front of
+it (`proxy.ssl: false`), matching that setup.
+
+The database and uploaded images live in a named Docker volume (`study_buddy_data`, mounted at
+`/data`, set via `STUDY_BUDDY_DATA_DIR`) so they survive every redeploy — a new image never touches
+existing data.
+
+Before deploying, export the secrets Kamal needs (see `.kamal/secrets`):
+
+```bash
+export KAMAL_REGISTRY_PASSWORD=...              # Docker Hub password/token for artemissoft1
+export NUXT_SESSION_PASSWORD=$(openssl rand -base64 32)   # generate once, then keep it stable across deploys
+```
+
+First-time setup (provisions the proxy, builds, and starts the app):
+
+```bash
+kamal setup
+```
+
+Routine deploys after that:
+
+```bash
+kamal deploy
+```
+
+Useful commands: `kamal app logs`, `kamal app exec -i bash` (to run `npm run create-admin` inside
+the running container), `kamal rollback`.
+
+### Manual / bare-metal alternative
 
 ```bash
 npm run build

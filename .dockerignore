@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Nuxt dev/build outputs
+.nuxt
+.nitro
+.cache
+.output
+
+# Persistent app data (mounted as a volume in production)
+.data
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git

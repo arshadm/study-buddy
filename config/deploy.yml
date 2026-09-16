@@ -1,0 +1,41 @@
+# Name of your application. Used to uniquely configure containers.
+service: study-buddy
+
+image: artemissoft1/study-buddy
+
+servers:
+  web:
+    # Shares this host with the spinorml/teenygrad sites, behind the same kamal-proxy.
+    - 46.62.237.88
+
+proxy:
+  ssl: false
+  hosts:
+    - study-buddy.spinorml.com
+  app_port: 3000
+  forward_headers: true
+  healthcheck:
+    path: /up
+    interval: 3
+    timeout: 5
+
+# Persistent SQLite database + uploaded question images, independent of each
+# deploy's container/image so they survive redeploys.
+volumes:
+  - "study_buddy_data:/data"
+
+env:
+  secret:
+    - NUXT_SESSION_PASSWORD
+
+registry:
+  server: registry.hub.docker.com
+  username: artemissoft1
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+
+ssh:
+  user: kamal
