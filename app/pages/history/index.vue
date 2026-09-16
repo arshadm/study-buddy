@@ -83,10 +83,11 @@ function dateLabel(ms: number) {
       v-else
       class="space-y-3"
     >
-      <div
+      <NuxtLink
         v-for="item in sessions"
         :key="item.id"
-        class="rounded-lg border border-default p-4"
+        :to="`/review/${item.id}`"
+        class="block rounded-lg border border-default p-4 hover:border-muted transition-colors"
       >
         <div class="flex items-center justify-between gap-4">
           <div>
@@ -112,7 +113,7 @@ function dateLabel(ms: number) {
             :style="{ width: percentFor(item) + '%' }"
           />
         </div>
-      </div>
+      </NuxtLink>
     </div>
 
     <div
