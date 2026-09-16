@@ -1,10 +1,16 @@
-import { and, eq, desc } from 'drizzle-orm'
+import { and, eq, desc, isNull } from 'drizzle-orm'
 import { db } from '../database/client'
 import { quizSessions, quizSessionSubjects, subjects } from '../database/schema'
 
 export async function getSessionHistory(studentId: number, subjectId?: number) {
   const sessions = await db.select().from(quizSessions)
-    .where(and(eq(quizSessions.studentId, studentId), eq(quizSessions.status, 'completed')))
+    .where(and(
+      eq(quizSessions.studentId, studentId),
+      eq(quizSessions.status, 'completed'),
+      // Mock-paper sections show up in the dedicated papers list instead, once
+      // the whole paper is done — not as individual entries here.
+      isNull(quizSessions.paperAttemptId)
+    ))
     .orderBy(desc(quizSessions.startedAt))
 
   const sessionIds = sessions.map(s => s.id)

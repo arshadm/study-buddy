@@ -1,6 +1,6 @@
-import { and, eq, gte } from 'drizzle-orm'
+import { and, eq, gte, isNull, or } from 'drizzle-orm'
 import { db } from '../../../database/client'
-import { subjects, quizSessions, quizSessionQuestions } from '../../../database/schema'
+import { subjects, quizSessions, quizSessionQuestions, paperAttempts } from '../../../database/schema'
 
 const WINDOWS_DAYS = [7, 14, 28] as const
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -22,7 +22,14 @@ export default defineEventHandler(async (event) => {
     startedAt: quizSessions.startedAt
   }).from(quizSessionQuestions)
     .innerJoin(quizSessions, eq(quizSessions.id, quizSessionQuestions.quizSessionId))
-    .where(and(eq(quizSessions.status, 'completed'), gte(quizSessions.startedAt, cutoff)))
+    .leftJoin(paperAttempts, eq(paperAttempts.id, quizSessions.paperAttemptId))
+    .where(and(
+      eq(quizSessions.status, 'completed'),
+      gte(quizSessions.startedAt, cutoff),
+      // A mock-paper section is only counted once the whole paper is done, not
+      // as each section individually finishes.
+      or(isNull(quizSessions.paperAttemptId), eq(paperAttempts.status, 'completed'))
+    ))
 
   const now = Date.now()
 

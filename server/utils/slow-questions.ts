@@ -30,9 +30,13 @@ export function getSlowQuestions(studentId: number, subjectId?: number, limit = 
       SUM(CASE WHEN ssq.is_correct = 1 THEN 1 ELSE 0 END) AS times_correct
     FROM quiz_session_questions ssq
     INNER JOIN quiz_sessions s ON s.id = ssq.quiz_session_id AND s.status = 'completed' AND s.student_id = ${studentId}
+    LEFT JOIN paper_attempts pa ON pa.id = s.paper_attempt_id
     INNER JOIN questions q ON q.id = ssq.question_id
     INNER JOIN subjects sub ON sub.id = q.subject_id
     WHERE ssq.time_spent_ms IS NOT NULL
+    -- A mock-paper section only counts once the whole paper is done, not as
+    -- each section individually finishes.
+    AND (s.paper_attempt_id IS NULL OR pa.status = 'completed')
     ${subjectId ? sql`AND q.subject_id = ${subjectId}` : sql``}
     GROUP BY q.id
     ORDER BY avg_time_ms DESC
