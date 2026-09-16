@@ -18,15 +18,16 @@ interface ExistingQuestion {
 }
 
 const route = useRoute()
-const { data: question } = await useFetch<ExistingQuestion>(`/api/admin/questions/${route.params.id}`)
+const subjectId = route.params.id as string
+const { data: question } = await useFetch<ExistingQuestion>(`/api/admin/questions/${route.params.questionId}`)
 
 async function onSaved() {
-  await navigateTo('/admin/questions')
+  await navigateTo(`/admin/subjects/${subjectId}`)
 }
 
 async function deleteQuestion() {
-  await $fetch(`/api/admin/questions/${route.params.id}`, { method: 'DELETE' })
-  await navigateTo('/admin/questions')
+  await $fetch(`/api/admin/questions/${route.params.questionId}`, { method: 'DELETE' })
+  await navigateTo(`/admin/subjects/${subjectId}`)
 }
 </script>
 
@@ -41,7 +42,7 @@ async function deleteQuestion() {
           icon="i-lucide-arrow-left"
           variant="ghost"
           color="neutral"
-          to="/admin/questions"
+          :to="`/admin/subjects/${subjectId}`"
         />
         <h1 class="text-2xl font-bold tracking-tight">
           Edit question

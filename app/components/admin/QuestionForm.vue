@@ -18,12 +18,16 @@ interface ExistingQuestion {
   options: { id: number, optionText: string, isCorrect: boolean }[]
 }
 
-const props = defineProps<{ question?: ExistingQuestion | null }>()
+const props = defineProps<{
+  question?: ExistingQuestion | null
+  fixedSubjectId?: number
+  fixedSubjectName?: string
+}>()
 const emit = defineEmits<{ saved: [] }>()
 
-const { data: subjects } = await useFetch<Subject[]>('/api/admin/subjects')
+const { data: subjects } = await useFetch<Subject[]>('/api/admin/subjects', { immediate: !props.fixedSubjectId })
 
-const subjectId = ref<number | undefined>(props.question?.subjectId)
+const subjectId = ref<number | undefined>(props.fixedSubjectId ?? props.question?.subjectId)
 const hintText = ref(props.question?.hintText ?? '')
 const difficulty = ref<number | undefined>(props.question?.difficulty ?? undefined)
 const type = ref<'multiple_choice' | 'free_response'>(props.question?.type ?? 'multiple_choice')
@@ -148,7 +152,10 @@ async function onSubmit() {
 
 <template>
   <div class="space-y-6">
-    <UFormField label="Subject">
+    <UFormField
+      v-if="!fixedSubjectId"
+      label="Subject"
+    >
       <USelectMenu
         v-model="subjectId"
         :items="(subjects || []).map(s => ({ label: s.name, value: s.id }))"
@@ -156,6 +163,14 @@ async function onSubmit() {
         placeholder="Choose a subject"
         class="w-full"
       />
+    </UFormField>
+    <UFormField
+      v-else
+      label="Subject"
+    >
+      <p class="text-sm">
+        {{ fixedSubjectName }}
+      </p>
     </UFormField>
 
     <UFormField label="Question image">

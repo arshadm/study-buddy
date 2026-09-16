@@ -13,17 +13,6 @@ interface Subject {
 const { data: subjects, refresh } = await useFetch<Subject[]>('/api/admin/subjects')
 
 const modalOpen = ref(false)
-const editing = ref<Subject | null>(null)
-
-function openCreate() {
-  editing.value = null
-  modalOpen.value = true
-}
-
-function openEdit(subject: Subject) {
-  editing.value = subject
-  modalOpen.value = true
-}
 
 async function onSaved() {
   modalOpen.value = false
@@ -48,7 +37,7 @@ async function toggleActive(subject: Subject) {
       <UButton
         label="Add subject"
         icon="i-lucide-plus"
-        @click="openCreate"
+        @click="modalOpen = true"
       />
     </div>
 
@@ -59,7 +48,10 @@ async function toggleActive(subject: Subject) {
         class="rounded-lg border border-default p-4 flex items-center justify-between gap-4"
         :class="{ 'opacity-50': !subject.isActive }"
       >
-        <div>
+        <NuxtLink
+          :to="`/admin/subjects/${subject.id}`"
+          class="min-w-0"
+        >
           <p class="font-medium">
             {{ subject.name }}
             <span
@@ -70,14 +62,14 @@ async function toggleActive(subject: Subject) {
           <p class="text-sm text-muted">
             {{ subject.defaultQuestionCount }} questions · {{ Math.round(subject.defaultTimeLimitSeconds / 60) }} min
           </p>
-        </div>
-        <div class="flex items-center gap-2">
+        </NuxtLink>
+        <div class="flex items-center gap-2 shrink-0">
           <UButton
-            label="Edit"
+            label="Manage questions"
+            :to="`/admin/subjects/${subject.id}`"
             variant="subtle"
             color="neutral"
             size="sm"
-            @click="openEdit(subject)"
           />
           <UButton
             :label="subject.isActive ? 'Deactivate' : 'Activate'"
@@ -92,13 +84,10 @@ async function toggleActive(subject: Subject) {
 
     <UModal
       v-model:open="modalOpen"
-      :title="editing ? 'Edit subject' : 'Add subject'"
+      title="Add subject"
     >
       <template #body>
-        <AdminSubjectForm
-          :subject="editing"
-          @saved="onSaved"
-        />
+        <AdminSubjectForm @saved="onSaved" />
       </template>
     </UModal>
   </div>
