@@ -9,6 +9,7 @@ const RECENCY_WINDOW_DAYS = 30
 const SLOWNESS_THRESHOLD_MULTIPLIER = 1.3
 const SLOWNESS_FACTOR = 1.25
 const UNSEEN_BOOST = 1.2
+const DIFFICULTY_DISTANCE_PENALTY = 0.25
 
 interface QuestionStatsRow {
   questionId: number
@@ -16,6 +17,7 @@ interface QuestionStatsRow {
   timesWrong: number
   lastSeenAt: number | null
   avgCorrectTimeMs: number | null
+  difficulty: number | null
 }
 
 interface WeightedQuestion {
@@ -30,9 +32,11 @@ export function getQuestionStats(studentId: number, subjectId: number): Question
     times_wrong: number
     last_seen_at: number | null
     avg_correct_time_ms: number | null
+    difficulty: number | null
   }>(sql`
     SELECT
       q.id AS question_id,
+      q.difficulty AS difficulty,
       COUNT(ssq.id) AS times_seen,
       SUM(CASE WHEN ssq.is_correct = 0 THEN 1 ELSE 0 END) AS times_wrong,
       MAX(ssq.answered_at) AS last_seen_at,
@@ -49,11 +53,28 @@ export function getQuestionStats(studentId: number, subjectId: number): Question
     timesSeen: r.times_seen ?? 0,
     timesWrong: r.times_wrong ?? 0,
     lastSeenAt: r.last_seen_at,
-    avgCorrectTimeMs: r.avg_correct_time_ms
+    avgCorrectTimeMs: r.avg_correct_time_ms,
+    difficulty: r.difficulty
   }))
 }
 
-export function computeWeight(stats: QuestionStatsRow, expectedTimePerQuestionMs: number): number {
+// A struggling student (low recent accuracy in this subject) gets easier questions weighted
+// up; a student doing well gets harder ones weighted up. 3 is the neutral/no-data default.
+function computeTargetDifficulty(stats: QuestionStatsRow[]): number {
+  const totalSeen = stats.reduce((sum, s) => sum + s.timesSeen, 0)
+  if (totalSeen === 0) return 3
+
+  const totalWrong = stats.reduce((sum, s) => sum + s.timesWrong, 0)
+  const accuracy = 1 - totalWrong / totalSeen
+
+  if (accuracy < 0.4) return 1
+  if (accuracy < 0.6) return 2
+  if (accuracy < 0.75) return 3
+  if (accuracy < 0.9) return 4
+  return 5
+}
+
+export function computeWeight(stats: QuestionStatsRow, expectedTimePerQuestionMs: number, targetDifficulty: number): number {
   const wrongFactor = 1 + stats.timesWrong * WRONG_ATTEMPT_WEIGHT
 
   let recencyBoost = 1.0
@@ -71,7 +92,11 @@ export function computeWeight(stats: QuestionStatsRow, expectedTimePerQuestionMs
 
   const unseenBoost = stats.timesSeen === 0 ? UNSEEN_BOOST : 1.0
 
-  return wrongFactor * recencyBoost * slownessFactor * unseenBoost
+  const difficultyFactor = stats.difficulty === null
+    ? 1.0
+    : 1 / (1 + Math.abs(stats.difficulty - targetDifficulty) * DIFFICULTY_DISTANCE_PENALTY)
+
+  return wrongFactor * recencyBoost * slownessFactor * unseenBoost * difficultyFactor
 }
 
 export function weightedSampleWithoutReplacement(items: WeightedQuestion[], n: number): number[] {
@@ -95,6 +120,7 @@ export function weightedSampleWithoutReplacement(items: WeightedQuestion[], n: n
 
 export function pickWeightedQuestionsForSubject(studentId: number, subjectId: number, count: number, expectedTimePerQuestionMs: number): number[] {
   const stats = getQuestionStats(studentId, subjectId)
-  const weighted = stats.map(s => ({ id: s.questionId, weight: computeWeight(s, expectedTimePerQuestionMs) }))
+  const targetDifficulty = computeTargetDifficulty(stats)
+  const weighted = stats.map(s => ({ id: s.questionId, weight: computeWeight(s, expectedTimePerQuestionMs, targetDifficulty) }))
   return weightedSampleWithoutReplacement(weighted, count)
 }

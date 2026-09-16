@@ -6,32 +6,45 @@ interface Option {
 }
 
 const props = defineProps<{
+  type: 'multiple_choice' | 'free_response'
   imageUrl: string
   hintText: string | null
+  answerUnitHint: string | null
   options: Option[]
   selectedOptionId: number | null
+  submittedAnswerText: string | null
   hintUsed: boolean
+  flagged: boolean
   saving: boolean
 }>()
 
 const emit = defineEmits<{
-  answer: [optionId: number, hintUsed: boolean]
+  'answer': [payload: { selectedOptionId?: number, answerText?: string, hintUsed: boolean }]
+  'toggle-flag': []
 }>()
 
 // Local copies seeded from props; the parent remounts this component (via :key)
 // whenever the question changes, so this only ever initializes once per question.
 const selectedOptionId = ref(props.selectedOptionId)
+const answerText = ref(props.submittedAnswerText ?? '')
 const hintRevealed = ref(props.hintUsed)
 
 function selectOption(optionId: number) {
   selectedOptionId.value = optionId
-  emit('answer', optionId, hintRevealed.value)
+  emit('answer', { selectedOptionId: optionId, hintUsed: hintRevealed.value })
+}
+
+function saveAnswerText() {
+  if (!answerText.value.trim()) return
+  emit('answer', { answerText: answerText.value, hintUsed: hintRevealed.value })
 }
 
 function revealHint() {
   hintRevealed.value = true
-  if (selectedOptionId.value !== null) {
-    emit('answer', selectedOptionId.value, true)
+  if (props.type === 'multiple_choice' && selectedOptionId.value !== null) {
+    emit('answer', { selectedOptionId: selectedOptionId.value, hintUsed: true })
+  } else if (props.type === 'free_response' && answerText.value.trim()) {
+    emit('answer', { answerText: answerText.value, hintUsed: true })
   }
 }
 </script>
@@ -46,7 +59,10 @@ function revealHint() {
       >
     </div>
 
-    <div class="grid gap-3 sm:grid-cols-2">
+    <div
+      v-if="type === 'multiple_choice'"
+      class="grid gap-3 sm:grid-cols-2"
+    >
       <button
         v-for="option in options"
         :key="option.id"
@@ -62,24 +78,53 @@ function revealHint() {
     </div>
 
     <div
-      v-if="hintText"
-      class="text-sm"
+      v-else
+      class="flex items-center gap-2 max-w-xs"
     >
-      <UButton
-        v-if="!hintRevealed"
-        label="Show hint"
-        icon="i-lucide-lightbulb"
-        variant="subtle"
-        color="neutral"
-        size="sm"
-        @click="revealHint"
+      <UInput
+        v-model="answerText"
+        placeholder="Your answer"
+        size="lg"
+        class="w-full"
+        @blur="saveAnswerText"
+        @keyup.enter="saveAnswerText"
       />
-      <p
-        v-else
-        class="rounded-md bg-elevated px-3 py-2 text-muted"
+      <span
+        v-if="answerUnitHint"
+        class="text-muted font-mono text-sm shrink-0"
+      >{{ answerUnitHint }}</span>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <div
+        v-if="hintText"
+        class="text-sm"
       >
-        {{ hintText }}
-      </p>
+        <UButton
+          v-if="!hintRevealed"
+          label="Show hint"
+          icon="i-lucide-lightbulb"
+          variant="subtle"
+          color="neutral"
+          size="sm"
+          @click="revealHint"
+        />
+        <p
+          v-else
+          class="rounded-md bg-elevated px-3 py-2 text-muted"
+        >
+          {{ hintText }}
+        </p>
+      </div>
+
+      <UButton
+        :label="flagged ? 'Flagged' : 'Flag for review'"
+        icon="i-lucide-flag"
+        :variant="flagged ? 'subtle' : 'ghost'"
+        :color="flagged ? 'warning' : 'neutral'"
+        size="sm"
+        @click="emit('toggle-flag')"
+      />
     </div>
 
     <p

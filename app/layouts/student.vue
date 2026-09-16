@@ -28,6 +28,12 @@ async function logout() {
               color="neutral"
             />
             <UButton
+              to="/papers"
+              label="Mock Papers"
+              variant="ghost"
+              color="neutral"
+            />
+            <UButton
               to="/history"
               label="History"
               variant="ghost"

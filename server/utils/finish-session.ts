@@ -5,7 +5,11 @@ import { quizSessions, quizSessionQuestions } from '../database/schema'
 export async function finishSession(sessionId: number) {
   await db.update(quizSessionQuestions)
     .set({ isCorrect: false })
-    .where(and(eq(quizSessionQuestions.quizSessionId, sessionId), isNull(quizSessionQuestions.selectedOptionId)))
+    .where(and(
+      eq(quizSessionQuestions.quizSessionId, sessionId),
+      isNull(quizSessionQuestions.selectedOptionId),
+      isNull(quizSessionQuestions.submittedAnswerText)
+    ))
 
   const [totals] = await db.select({
     correct: sql<number>`SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END)`,

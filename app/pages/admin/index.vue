@@ -4,16 +4,18 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 interface Subject { id: number }
 interface Question { id: number }
 interface Student { id: number }
+interface Paper { id: number }
 interface SubjectPerformance {
   subjectId: number
   subjectName: string
   windows: Record<string, { percent: number | null, questions: number }>
 }
 
-const [{ data: subjects }, { data: questions }, { data: students }, { data: performance }] = await Promise.all([
+const [{ data: subjects }, { data: questions }, { data: students }, { data: papers }, { data: performance }] = await Promise.all([
   useFetch<Subject[]>('/api/admin/subjects'),
   useFetch<Question[]>('/api/admin/questions'),
   useFetch<Student[]>('/api/admin/students'),
+  useFetch<Paper[]>('/api/admin/papers'),
   useFetch<SubjectPerformance[]>('/api/admin/stats/subject-performance')
 ])
 
@@ -22,7 +24,8 @@ const windowDays = [7, 14, 28] as const
 const cards = computed(() => [
   { label: 'Subjects', count: subjects.value?.length ?? 0, to: '/admin/subjects', icon: 'i-lucide-book-open' },
   { label: 'Questions', count: questions.value?.length ?? 0, to: '/admin/questions', icon: 'i-lucide-help-circle' },
-  { label: 'Students', count: students.value?.length ?? 0, to: '/admin/students', icon: 'i-lucide-users' }
+  { label: 'Students', count: students.value?.length ?? 0, to: '/admin/students', icon: 'i-lucide-users' },
+  { label: 'Papers', count: papers.value?.length ?? 0, to: '/admin/papers', icon: 'i-lucide-file-stack' }
 ])
 </script>
 
@@ -32,7 +35,7 @@ const cards = computed(() => [
       Admin
     </h1>
 
-    <div class="grid gap-4 sm:grid-cols-3">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <NuxtLink
         v-for="card in cards"
         :key="card.label"

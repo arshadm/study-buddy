@@ -42,20 +42,26 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Question data missing' })
   }
 
-  const options = await db.select({
-    id: questionOptions.id,
-    optionText: questionOptions.optionText,
-    sortOrder: questionOptions.sortOrder
-  }).from(questionOptions)
-    .where(eq(questionOptions.questionId, current.questionId))
-    .orderBy(questionOptions.sortOrder)
+  const options = questionRow.type === 'multiple_choice'
+    ? await db.select({
+        id: questionOptions.id,
+        optionText: questionOptions.optionText,
+        sortOrder: questionOptions.sortOrder
+      }).from(questionOptions)
+        .where(eq(questionOptions.questionId, current.questionId))
+        .orderBy(questionOptions.sortOrder)
+    : []
 
   return {
     sequenceIndex,
+    type: questionRow.type,
     imageUrl: `/uploads/${questionRow.imagePath}`,
     hintText: questionRow.hintText,
+    answerUnitHint: questionRow.answerUnitHint,
     selectedOptionId: current.selectedOptionId,
+    submittedAnswerText: current.submittedAnswerText,
     hintUsed: current.hintUsed,
+    flagged: current.flagged,
     options
   }
 })

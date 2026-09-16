@@ -15,12 +15,27 @@ interface HistoryItem {
   startedAt: number
   subjects: { subjectId: number, subjectName: string }[]
 }
+interface SlowQuestion {
+  questionId: number
+  imageUrl: string
+  subjectName: string
+  avgTimeMs: number
+  timesSeen: number
+  timesCorrect: number
+}
 
 const route = useRoute()
 const id = route.params.id as string
 
 const { data: student, refresh } = await useFetch<Student>(`/api/admin/students/${id}`)
 const { data: history } = await useFetch<HistoryItem[]>(`/api/admin/students/${id}/history`)
+const { data: slowQuestions } = await useFetch<SlowQuestion[]>(`/api/admin/students/${id}/slow-questions`)
+
+function timeLabel(ms: number) {
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+}
 
 const displayName = ref('')
 const newPassword = ref('')
@@ -154,6 +169,37 @@ function dateLabel(ms: number) {
         </div>
         <p class="font-mono font-semibold">
           {{ item.scoreCorrect }} / {{ item.scoreTotal }}
+        </p>
+      </div>
+    </div>
+
+    <div
+      v-if="slowQuestions?.length"
+      class="space-y-3"
+    >
+      <h2 class="text-lg font-bold tracking-tight">
+        Where time is going
+      </h2>
+      <div
+        v-for="q in slowQuestions"
+        :key="q.questionId"
+        class="rounded-lg border border-default p-3 flex items-center gap-4"
+      >
+        <img
+          :src="q.imageUrl"
+          alt="Question"
+          class="size-14 rounded-md object-contain bg-white border border-default shrink-0"
+        >
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-mono text-muted">
+            {{ q.subjectName }}
+          </p>
+          <p class="text-sm">
+            Seen {{ q.timesSeen }}×, correct {{ q.timesCorrect }}×
+          </p>
+        </div>
+        <p class="font-mono font-semibold shrink-0">
+          {{ timeLabel(q.avgTimeMs) }}
         </p>
       </div>
     </div>

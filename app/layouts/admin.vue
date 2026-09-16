@@ -39,6 +39,12 @@ async function logout() {
               variant="ghost"
               color="neutral"
             />
+            <UButton
+              to="/admin/papers"
+              label="Papers"
+              variant="ghost"
+              color="neutral"
+            />
           </nav>
         </div>
 

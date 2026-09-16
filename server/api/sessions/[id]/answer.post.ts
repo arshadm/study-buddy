@@ -1,11 +1,13 @@
 import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../../../database/client'
-import { quizSessions, quizSessionQuestions, questionOptions } from '../../../database/schema'
+import { quizSessions, quizSessionQuestions, questionOptions, questions } from '../../../database/schema'
+import { checkFreeResponseAnswer } from '../../../utils/free-response'
 
 const bodySchema = z.object({
   sequenceIndex: z.number().int().min(0),
-  selectedOptionId: z.number().int(),
+  selectedOptionId: z.number().int().optional(),
+  answerText: z.string().optional(),
   hintUsed: z.boolean().default(false),
   clientElapsedMs: z.number().int().min(0)
 })
@@ -38,25 +40,52 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Question not found in this session' })
   }
 
-  const [option] = await db.select().from(questionOptions)
-    .where(and(eq(questionOptions.id, body.selectedOptionId), eq(questionOptions.questionId, current.questionId)))
-    .limit(1)
-
-  if (!option) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid option for this question' })
+  const [question] = await db.select().from(questions).where(eq(questions.id, current.questionId)).limit(1)
+  if (!question) {
+    throw createError({ statusCode: 500, statusMessage: 'Question data missing' })
   }
 
   const now = Date.now()
   const serverElapsedMs = current.presentedAt ? now - current.presentedAt : body.clientElapsedMs
-  const timeSpentMs = Math.min(body.clientElapsedMs, serverElapsedMs)
+  const timeSpentMs = Math.max(0, Math.min(body.clientElapsedMs, serverElapsedMs))
 
-  await db.update(quizSessionQuestions).set({
-    selectedOptionId: option.id,
-    isCorrect: option.isCorrect,
-    hintUsed: body.hintUsed,
-    timeSpentMs: Math.max(0, timeSpentMs),
-    answeredAt: now
-  }).where(eq(quizSessionQuestions.id, current.id))
+  if (question.type === 'multiple_choice') {
+    if (body.selectedOptionId === undefined) {
+      throw createError({ statusCode: 400, statusMessage: 'selectedOptionId is required for this question' })
+    }
+
+    const [option] = await db.select().from(questionOptions)
+      .where(and(eq(questionOptions.id, body.selectedOptionId), eq(questionOptions.questionId, current.questionId)))
+      .limit(1)
+
+    if (!option) {
+      throw createError({ statusCode: 400, statusMessage: 'Invalid option for this question' })
+    }
+
+    await db.update(quizSessionQuestions).set({
+      selectedOptionId: option.id,
+      submittedAnswerText: null,
+      isCorrect: option.isCorrect,
+      hintUsed: body.hintUsed,
+      timeSpentMs,
+      answeredAt: now
+    }).where(eq(quizSessionQuestions.id, current.id))
+  } else {
+    if (body.answerText === undefined || body.answerText.trim() === '') {
+      throw createError({ statusCode: 400, statusMessage: 'answerText is required for this question' })
+    }
+
+    const isCorrect = checkFreeResponseAnswer(question, body.answerText)
+
+    await db.update(quizSessionQuestions).set({
+      selectedOptionId: null,
+      submittedAnswerText: body.answerText,
+      isCorrect,
+      hintUsed: body.hintUsed,
+      timeSpentMs,
+      answeredAt: now
+    }).where(eq(quizSessionQuestions.id, current.id))
+  }
 
   return { ok: true }
 })

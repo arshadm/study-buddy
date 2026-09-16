@@ -46,11 +46,19 @@ export default defineEventHandler(async (event) => {
       sequenceIndex: sq.sequenceIndex,
       subjectName: subjectsById.get(sq.subjectId)?.name,
       imageUrl: `/uploads/${question.imagePath}`,
+      workedSolutionImageUrl: question.workedSolutionImagePath ? `/uploads/${question.workedSolutionImagePath}` : null,
       hintText: question.hintText,
       hintUsed: sq.hintUsed,
+      flagged: sq.flagged,
       timeSpentMs: sq.timeSpentMs,
       isCorrect: sq.isCorrect,
+      type: question.type,
       selectedOptionId: sq.selectedOptionId,
+      submittedAnswerText: sq.submittedAnswerText,
+      correctAnswerText: question.type === 'free_response'
+        ? (question.answerType === 'numeric' ? String(question.answerNumericValue) : question.answerText)
+        : null,
+      answerUnitHint: question.answerUnitHint,
       options: options.map(o => ({ id: o.id, optionText: o.optionText, isCorrect: o.isCorrect }))
     }
   })

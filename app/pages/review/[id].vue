@@ -5,11 +5,17 @@ interface ReviewItem {
   sequenceIndex: number
   subjectName?: string
   imageUrl: string
+  workedSolutionImageUrl: string | null
   hintText: string | null
   hintUsed: boolean
+  flagged: boolean
   timeSpentMs: number | null
   isCorrect: boolean | null
+  type: 'multiple_choice' | 'free_response'
   selectedOptionId: number | null
+  submittedAnswerText: string | null
+  correctAnswerText: string | null
+  answerUnitHint: string | null
   options: { id: number, optionText: string, isCorrect: boolean }[]
 }
 

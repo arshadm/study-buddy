@@ -7,6 +7,11 @@ interface Question {
   subjectId: number
   imagePath: string
   hintText: string | null
+  difficulty: number | null
+  type: 'multiple_choice' | 'free_response'
+  answerType: 'numeric' | 'text' | null
+  answerNumericValue: number | null
+  answerText: string | null
   options: { id: number, optionText: string, isCorrect: boolean }[]
 }
 
@@ -24,6 +29,9 @@ function subjectName(id: number) {
 }
 
 function correctAnswer(question: Question) {
+  if (question.type === 'free_response') {
+    return question.answerType === 'numeric' ? String(question.answerNumericValue) : (question.answerText ?? '')
+  }
   return question.options.find(o => o.isCorrect)?.optionText ?? ''
 }
 </script>
@@ -72,8 +80,10 @@ function correctAnswer(question: Question) {
           class="size-16 rounded-md object-contain bg-white border border-default shrink-0"
         >
         <div class="min-w-0">
-          <p class="text-xs font-mono text-muted">
+          <p class="text-xs font-mono text-muted flex items-center gap-2">
             {{ subjectName(question.subjectId) }}
+            <span v-if="question.type === 'free_response'">· free response</span>
+            <span v-if="question.difficulty">· difficulty {{ question.difficulty }}</span>
           </p>
           <p class="text-sm truncate">
             Correct: {{ correctAnswer(question) }}

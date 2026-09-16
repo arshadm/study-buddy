@@ -1,15 +1,8 @@
-import { z } from 'zod'
 import { db } from '../../../database/client'
 import { questions, questionOptions } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage } from '../../../utils/uploads'
-
-const optionsSchema = z.array(z.object({
-  text: z.string().min(1),
-  isCorrect: z.boolean()
-})).min(2).refine(opts => opts.filter(o => o.isCorrect).length === 1, {
-  message: 'Exactly one option must be marked correct'
-})
+import { optionsSchema, parseQuestionType, parseDifficulty, parseFreeResponseFields, emptyFreeResponseFields } from '../../../utils/question-validation'
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, 'admin')
@@ -25,20 +18,34 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Question image is required' })
   }
 
-  let options
-  try {
-    options = optionsSchema.parse(JSON.parse(fields.options || '[]'))
-  } catch (err) {
-    throw createError({ statusCode: 400, statusMessage: err instanceof Error ? err.message : 'Invalid options' })
+  const type = parseQuestionType(fields)
+  const difficulty = parseDifficulty(fields)
+
+  let options: { text: string, isCorrect: boolean }[] = []
+  let freeResponseFields = emptyFreeResponseFields
+
+  if (type === 'multiple_choice') {
+    try {
+      options = optionsSchema.parse(JSON.parse(fields.options || '[]'))
+    } catch (err) {
+      throw createError({ statusCode: 400, statusMessage: err instanceof Error ? err.message : 'Invalid options' })
+    }
+  } else {
+    freeResponseFields = parseFreeResponseFields(fields)
   }
 
   const imagePath = await saveQuestionImage(files.image)
+  const workedSolutionImagePath = files.workedSolutionImage ? await saveQuestionImage(files.workedSolutionImage) : null
   const now = Date.now()
 
   const [question] = await db.insert(questions).values({
     subjectId,
     imagePath,
+    workedSolutionImagePath,
     hintText: fields.hintText || null,
+    difficulty,
+    type,
+    ...freeResponseFields,
     createdAt: now,
     updatedAt: now
   }).returning()
@@ -47,14 +54,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Failed to create question' })
   }
 
-  await db.insert(questionOptions).values(
-    options.map((opt, index) => ({
-      questionId: question.id,
-      optionText: opt.text,
-      isCorrect: opt.isCorrect,
-      sortOrder: index
-    }))
-  )
+  if (type === 'multiple_choice') {
+    await db.insert(questionOptions).values(
+      options.map((opt, index) => ({
+        questionId: question.id,
+        optionText: opt.text,
+        isCorrect: opt.isCorrect,
+        sortOrder: index
+      }))
+    )
+  }
 
   return question
 })
