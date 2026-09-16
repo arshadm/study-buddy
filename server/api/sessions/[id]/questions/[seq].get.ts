@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '../../../../database/client'
 import { quizSessions, quizSessionQuestions, questions, questionOptions } from '../../../../database/schema'
+import { seededShuffle } from '../../../../utils/seeded-shuffle'
 
 export default defineEventHandler(async (event) => {
   const { user } = await requireRole(event, 'student')
@@ -42,15 +43,19 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Question data missing' })
   }
 
-  const options = questionRow.type === 'multiple_choice'
-    ? await db.select({
-        id: questionOptions.id,
-        optionText: questionOptions.optionText,
-        sortOrder: questionOptions.sortOrder
-      }).from(questionOptions)
-        .where(eq(questionOptions.questionId, current.questionId))
-        .orderBy(questionOptions.sortOrder)
-    : []
+  let options: { id: number, optionText: string, sortOrder: number }[] = []
+  if (questionRow.type === 'multiple_choice') {
+    const rows = await db.select({
+      id: questionOptions.id,
+      optionText: questionOptions.optionText,
+      sortOrder: questionOptions.sortOrder
+    }).from(questionOptions)
+      .where(eq(questionOptions.questionId, current.questionId))
+      .orderBy(questionOptions.sortOrder)
+
+    // Randomized per session-question, but stable across repeated fetches (see seededShuffle).
+    options = seededShuffle(rows, current.id)
+  }
 
   return {
     sequenceIndex,
