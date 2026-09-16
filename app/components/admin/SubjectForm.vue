@@ -17,7 +17,7 @@ const schema = z.object({
   name: z.string().min(1, 'Required').max(100),
   description: z.string().max(500).optional(),
   defaultQuestionCount: z.number().int().min(1).max(200),
-  defaultTimeLimitMinutes: z.number().min(0.5).max(24 * 60)
+  defaultTimeLimitMinutes: z.number().min(1).max(24 * 60)
 })
 
 type Schema = z.output<typeof schema>
@@ -104,7 +104,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         <UInputNumber
           v-model="state.defaultTimeLimitMinutes"
           class="w-full"
-          :min="0.5"
+          :min="1"
           :step="1"
         />
       </UFormField>
