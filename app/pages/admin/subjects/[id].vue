@@ -142,13 +142,13 @@ function correctAnswer(question: Question) {
                 <span v-if="question.difficulty">· difficulty {{ question.difficulty }}</span>
               </p>
               <p class="text-sm truncate">
-                Correct: {{ correctAnswer(question) }}
+                Correct: <MathText :text="correctAnswer(question)" />
               </p>
               <p
                 v-if="question.hintText"
                 class="text-xs text-muted truncate"
               >
-                Hint: {{ question.hintText }}
+                Hint: <MathText :text="question.hintText" />
               </p>
             </div>
           </NuxtLink>

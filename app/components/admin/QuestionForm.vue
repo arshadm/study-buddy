@@ -272,6 +272,12 @@ async function onSubmit() {
           v-model="answerText"
           class="w-full"
         />
+        <p
+          v-if="answerText.includes('$')"
+          class="mt-1 text-sm text-muted"
+        >
+          <MathText :text="answerText" />
+        </p>
       </UFormField>
 
       <UFormField
@@ -287,7 +293,7 @@ async function onSubmit() {
 
     <UFormField
       label="Hint"
-      hint="Optional"
+      hint="Optional — wrap LaTeX in $...$ or $$...$$"
     >
       <UTextarea
         v-model="hintText"
@@ -295,6 +301,12 @@ async function onSubmit() {
         :rows="2"
         placeholder="Shown to the student if they ask for a hint"
       />
+      <p
+        v-if="hintText.includes('$')"
+        class="mt-1 text-sm text-muted"
+      >
+        <MathText :text="hintText" />
+      </p>
     </UFormField>
 
     <UFormField

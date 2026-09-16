@@ -94,7 +94,7 @@ const timeSpentLabel = computed(() => {
           !option.isCorrect && option.id !== item.selectedOptionId ? 'border-default' : ''
         ]"
       >
-        <span>{{ option.optionText }}</span>
+        <MathText :text="option.optionText" />
         <span
           v-if="option.id === item.selectedOptionId"
           class="text-xs text-muted font-mono"
@@ -111,17 +111,17 @@ const timeSpentLabel = computed(() => {
         :class="item.isCorrect ? 'border-success/50 bg-success/5' : 'border-error/50 bg-error/5'"
       >
         <span class="text-xs text-muted font-mono block">Your answer</span>
-        {{ item.submittedAnswerText ?? '—' }} <span
+        <MathText :text="item.submittedAnswerText ?? '—'" /> <span
           v-if="item.answerUnitHint"
           class="text-muted"
-        >{{ item.answerUnitHint }}</span>
+        ><MathText :text="item.answerUnitHint" /></span>
       </div>
       <div class="rounded-md border border-success/50 bg-success/5 px-3 py-2">
         <span class="text-xs text-muted font-mono block">Correct answer</span>
-        {{ item.correctAnswerText }} <span
+        <MathText :text="item.correctAnswerText" /> <span
           v-if="item.answerUnitHint"
           class="text-muted"
-        >{{ item.answerUnitHint }}</span>
+        ><MathText :text="item.answerUnitHint" /></span>
       </div>
     </div>
 

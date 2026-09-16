@@ -24,34 +24,42 @@ function markCorrect(index: number) {
     <div
       v-for="(option, index) in options"
       :key="index"
-      class="flex items-center gap-2"
+      class="space-y-1"
     >
-      <button
-        type="button"
-        class="shrink-0 size-5 rounded-full border flex items-center justify-center"
-        :class="option.isCorrect ? 'border-success bg-success/10' : 'border-default'"
-        :aria-label="option.isCorrect ? 'Correct answer' : 'Mark as correct answer'"
-        @click="markCorrect(index)"
-      >
-        <UIcon
-          v-if="option.isCorrect"
-          name="i-lucide-check"
-          class="size-3 text-success"
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="shrink-0 size-5 rounded-full border flex items-center justify-center"
+          :class="option.isCorrect ? 'border-success bg-success/10' : 'border-default'"
+          :aria-label="option.isCorrect ? 'Correct answer' : 'Mark as correct answer'"
+          @click="markCorrect(index)"
+        >
+          <UIcon
+            v-if="option.isCorrect"
+            name="i-lucide-check"
+            class="size-3 text-success"
+          />
+        </button>
+        <UInput
+          v-model="option.text"
+          placeholder="Option text — wrap LaTeX in $...$"
+          class="w-full"
         />
-      </button>
-      <UInput
-        v-model="option.text"
-        placeholder="Option text"
-        class="w-full"
-      />
-      <UButton
-        icon="i-lucide-x"
-        variant="ghost"
-        color="neutral"
-        size="sm"
-        :disabled="options.length <= 2"
-        @click="removeOption(index)"
-      />
+        <UButton
+          icon="i-lucide-x"
+          variant="ghost"
+          color="neutral"
+          size="sm"
+          :disabled="options.length <= 2"
+          @click="removeOption(index)"
+        />
+      </div>
+      <p
+        v-if="option.text.includes('$')"
+        class="pl-7 text-sm text-muted"
+      >
+        <MathText :text="option.text" />
+      </p>
     </div>
 
     <UButton

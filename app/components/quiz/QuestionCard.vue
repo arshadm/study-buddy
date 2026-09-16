@@ -73,7 +73,7 @@ function revealHint() {
           : 'border-default hover:border-muted'"
         @click="selectOption(option.id)"
       >
-        {{ option.optionText }}
+        <MathText :text="option.optionText" />
       </button>
     </div>
 
@@ -92,7 +92,9 @@ function revealHint() {
       <span
         v-if="answerUnitHint"
         class="text-muted font-mono text-sm shrink-0"
-      >{{ answerUnitHint }}</span>
+      >
+        <MathText :text="answerUnitHint" />
+      </span>
     </div>
 
     <div class="flex items-center gap-4">
@@ -113,7 +115,7 @@ function revealHint() {
           v-else
           class="rounded-md bg-elevated px-3 py-2 text-muted"
         >
-          {{ hintText }}
+          <MathText :text="hintText" />
         </p>
       </div>
 

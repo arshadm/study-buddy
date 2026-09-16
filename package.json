@@ -19,6 +19,7 @@
     "@nuxt/ui": "^4.11.1",
     "better-sqlite3": "^11.10.0",
     "drizzle-orm": "^0.44.5",
+    "katex": "^0.16.11",
     "nuxt": "^4.5.2",
     "nuxt-auth-utils": "^0.5.20",
     "sharp": "^0.34.4",
