@@ -9,24 +9,30 @@ const props = defineProps<{
   imageUrl: string
   hintText: string | null
   options: Option[]
-  submitting: boolean
+  selectedOptionId: number | null
+  hintUsed: boolean
+  saving: boolean
 }>()
 
 const emit = defineEmits<{
-  submit: [optionId: number, hintUsed: boolean]
+  answer: [optionId: number, hintUsed: boolean]
 }>()
 
-const selectedOptionId = ref<number | null>(null)
-const hintRevealed = ref(false)
+// Local copies seeded from props; the parent remounts this component (via :key)
+// whenever the question changes, so this only ever initializes once per question.
+const selectedOptionId = ref(props.selectedOptionId)
+const hintRevealed = ref(props.hintUsed)
 
-watch(() => props.imageUrl, () => {
-  selectedOptionId.value = null
-  hintRevealed.value = false
-})
+function selectOption(optionId: number) {
+  selectedOptionId.value = optionId
+  emit('answer', optionId, hintRevealed.value)
+}
 
-function submit() {
-  if (selectedOptionId.value === null) return
-  emit('submit', selectedOptionId.value, hintRevealed.value)
+function revealHint() {
+  hintRevealed.value = true
+  if (selectedOptionId.value !== null) {
+    emit('answer', selectedOptionId.value, true)
+  }
 }
 </script>
 
@@ -49,7 +55,7 @@ function submit() {
         :class="selectedOptionId === option.id
           ? 'border-primary bg-primary/5'
           : 'border-default hover:border-muted'"
-        @click="selectedOptionId = option.id"
+        @click="selectOption(option.id)"
       >
         {{ option.optionText }}
       </button>
@@ -66,7 +72,7 @@ function submit() {
         variant="subtle"
         color="neutral"
         size="sm"
-        @click="hintRevealed = true"
+        @click="revealHint"
       />
       <p
         v-else
@@ -76,13 +82,11 @@ function submit() {
       </p>
     </div>
 
-    <UButton
-      label="Submit answer"
-      size="lg"
-      block
-      :disabled="selectedOptionId === null"
-      :loading="submitting"
-      @click="submit"
-    />
+    <p
+      class="text-xs font-mono text-muted h-4"
+      :class="{ 'opacity-0': !saving }"
+    >
+      Saving…
+    </p>
   </div>
 </template>

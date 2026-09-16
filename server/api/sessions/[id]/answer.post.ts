@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../../../database/client'
 import { quizSessions, quizSessionQuestions, questionOptions } from '../../../database/schema'
 
@@ -30,13 +30,12 @@ export default defineEventHandler(async (event) => {
   const [current] = await db.select().from(quizSessionQuestions)
     .where(and(
       eq(quizSessionQuestions.quizSessionId, sessionId),
-      eq(quizSessionQuestions.sequenceIndex, body.sequenceIndex),
-      isNull(quizSessionQuestions.selectedOptionId)
+      eq(quizSessionQuestions.sequenceIndex, body.sequenceIndex)
     ))
     .limit(1)
 
   if (!current) {
-    throw createError({ statusCode: 409, statusMessage: 'Question already answered or not found' })
+    throw createError({ statusCode: 404, statusMessage: 'Question not found in this session' })
   }
 
   const [option] = await db.select().from(questionOptions)
