@@ -56,8 +56,7 @@ export default defineEventHandler(async (event) => {
     .from(quizSessionQuestions)
     .where(and(
       eq(quizSessionQuestions.quizSessionId, id),
-      isNull(quizSessionQuestions.selectedOptionId),
-      isNull(quizSessionQuestions.submittedAnswerText)
+      isNull(quizSessionQuestions.isCorrect)
     ))
     .orderBy(asc(quizSessionQuestions.sequenceIndex))
     .limit(1)

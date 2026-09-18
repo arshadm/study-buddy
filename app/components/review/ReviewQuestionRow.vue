@@ -1,7 +1,8 @@
 <script setup lang="ts">
 interface Option {
   id: number
-  optionText: string
+  optionText: string | null
+  optionImageUrl: string | null
   isCorrect: boolean
 }
 
@@ -15,11 +16,9 @@ const props = defineProps<{
     flagged: boolean
     timeSpentMs: number | null
     isCorrect: boolean | null
-    type: 'multiple_choice' | 'free_response'
+    type: 'multiple_choice' | 'self_marked_image'
     selectedOptionId: number | null
-    submittedAnswerText: string | null
-    correctAnswerText: string | null
-    answerUnitHint: string | null
+    submittedAnswerImageUrl: string | null
     options: Option[]
   }
 }>()
@@ -87,18 +86,30 @@ const timeSpentLabel = computed(() => {
       <div
         v-for="option in item.options"
         :key="option.id"
-        class="rounded-md border px-3 py-2 text-sm flex items-center justify-between"
+        class="rounded-md border px-3 py-2 text-sm space-y-1"
         :class="[
           option.isCorrect ? 'border-success/50 bg-success/5' : '',
           option.id === item.selectedOptionId && !option.isCorrect ? 'border-error/50 bg-error/5' : '',
           !option.isCorrect && option.id !== item.selectedOptionId ? 'border-default' : ''
         ]"
       >
-        <MathText :text="option.optionText" />
-        <span
-          v-if="option.id === item.selectedOptionId"
-          class="text-xs text-muted font-mono"
-        >your answer</span>
+        <div class="flex items-center justify-between">
+          <MathText
+            v-if="option.optionText"
+            :text="option.optionText"
+          />
+          <span v-else />
+          <span
+            v-if="option.id === item.selectedOptionId"
+            class="text-xs text-muted font-mono"
+          >your answer</span>
+        </div>
+        <img
+          v-if="option.optionImageUrl"
+          :src="option.optionImageUrl"
+          alt="Answer option"
+          class="w-full h-24 object-contain bg-white rounded"
+        >
       </div>
     </div>
 
@@ -106,26 +117,32 @@ const timeSpentLabel = computed(() => {
       v-else
       class="grid gap-2 sm:grid-cols-2 text-sm"
     >
-      <div
-        class="rounded-md border px-3 py-2"
-        :class="item.isCorrect ? 'border-success/50 bg-success/5' : 'border-error/50 bg-error/5'"
-      >
-        <span class="text-xs text-muted font-mono block">Your answer</span>
-        <MathText :text="item.submittedAnswerText ?? '—'" /> <span
-          v-if="item.answerUnitHint"
+      <div>
+        <span class="text-xs text-muted font-mono block mb-1">Your answer</span>
+        <img
+          v-if="item.submittedAnswerImageUrl"
+          :src="item.submittedAnswerImageUrl"
+          alt="Your submitted answer"
+          class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
+        >
+        <p
+          v-else
           class="text-muted"
-        ><MathText :text="item.answerUnitHint" /></span>
+        >
+          Not submitted
+        </p>
       </div>
-      <div class="rounded-md border border-success/50 bg-success/5 px-3 py-2">
-        <span class="text-xs text-muted font-mono block">Correct answer</span>
-        <MathText :text="item.correctAnswerText" /> <span
-          v-if="item.answerUnitHint"
-          class="text-muted"
-        ><MathText :text="item.answerUnitHint" /></span>
+      <div v-if="item.workedSolutionImageUrl">
+        <span class="text-xs text-muted font-mono block mb-1">Worked solution</span>
+        <img
+          :src="item.workedSolutionImageUrl"
+          alt="Worked solution"
+          class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
+        >
       </div>
     </div>
 
-    <div v-if="item.workedSolutionImageUrl">
+    <div v-if="item.type === 'multiple_choice' && item.workedSolutionImageUrl">
       <UButton
         v-if="!solutionRevealed"
         label="Show worked solution"

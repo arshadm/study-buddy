@@ -43,28 +43,39 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Question data missing' })
   }
 
-  let options: { id: number, optionText: string, sortOrder: number }[] = []
+  let options: { id: number, optionText: string | null, optionImageUrl: string | null, sortOrder: number }[] = []
   if (questionRow.type === 'multiple_choice') {
     const rows = await db.select({
       id: questionOptions.id,
       optionText: questionOptions.optionText,
+      optionImagePath: questionOptions.optionImagePath,
       sortOrder: questionOptions.sortOrder
     }).from(questionOptions)
       .where(eq(questionOptions.questionId, current.questionId))
       .orderBy(questionOptions.sortOrder)
 
     // Randomized per session-question, but stable across repeated fetches (see seededShuffle).
-    options = seededShuffle(rows, current.id)
+    options = seededShuffle(rows, current.id).map(o => ({
+      id: o.id,
+      optionText: o.optionText,
+      optionImageUrl: o.optionImagePath ? `/uploads/${o.optionImagePath}` : null,
+      sortOrder: o.sortOrder
+    }))
   }
 
   return {
     sequenceIndex,
     type: questionRow.type,
+    optionFormat: questionRow.optionFormat,
     imageUrl: `/uploads/${questionRow.imagePath}`,
     hintText: questionRow.hintText,
-    answerUnitHint: questionRow.answerUnitHint,
     selectedOptionId: current.selectedOptionId,
-    submittedAnswerText: current.submittedAnswerText,
+    submittedAnswerImageUrl: current.submittedAnswerImagePath ? `/uploads/${current.submittedAnswerImagePath}` : null,
+    // Only reveal the worked solution once the student has submitted their own attempt.
+    workedSolutionImageUrl: current.submittedAnswerImagePath && questionRow.workedSolutionImagePath
+      ? `/uploads/${questionRow.workedSolutionImagePath}`
+      : null,
+    selfMarkedCorrect: questionRow.type === 'self_marked_image' ? current.isCorrect : null,
     hintUsed: current.hintUsed,
     flagged: current.flagged,
     options

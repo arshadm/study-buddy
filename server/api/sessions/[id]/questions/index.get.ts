@@ -16,8 +16,7 @@ export default defineEventHandler(async (event) => {
 
   const rows = await db.select({
     sequenceIndex: quizSessionQuestions.sequenceIndex,
-    selectedOptionId: quizSessionQuestions.selectedOptionId,
-    submittedAnswerText: quizSessionQuestions.submittedAnswerText,
+    isCorrect: quizSessionQuestions.isCorrect,
     flagged: quizSessionQuestions.flagged
   }).from(quizSessionQuestions)
     .where(eq(quizSessionQuestions.quizSessionId, sessionId))
@@ -25,7 +24,7 @@ export default defineEventHandler(async (event) => {
 
   return rows.map(r => ({
     sequenceIndex: r.sequenceIndex,
-    answered: r.selectedOptionId !== null || r.submittedAnswerText !== null,
+    answered: r.isCorrect !== null,
     flagged: r.flagged
   }))
 })

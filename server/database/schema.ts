@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, real, uniqueIndex, index, primaryKey } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, integer, text, uniqueIndex, index, primaryKey } from 'drizzle-orm/sqlite-core'
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -44,14 +44,13 @@ export const questions = sqliteTable('questions', {
   sectionId: integer('section_id').references(() => sections.id, { onDelete: 'set null' }),
   imagePath: text('image_path').notNull(),
   hintText: text('hint_text'),
+  // Required (enforced in the API, not the DB) when type is 'self_marked_image', since
+  // that's what the student checks their own uploaded answer against.
   workedSolutionImagePath: text('worked_solution_image_path'),
   difficulty: integer('difficulty'),
-  type: text('type', { enum: ['multiple_choice', 'free_response'] }).notNull().default('multiple_choice'),
-  answerType: text('answer_type', { enum: ['numeric', 'text'] }),
-  answerNumericValue: real('answer_numeric_value'),
-  answerTolerancePercent: real('answer_tolerance_percent'),
-  answerText: text('answer_text'),
-  answerUnitHint: text('answer_unit_hint'),
+  type: text('type', { enum: ['multiple_choice', 'self_marked_image'] }).notNull().default('multiple_choice'),
+  // Only meaningful when type is 'multiple_choice' — whether question_options carry text or images.
+  optionFormat: text('option_format', { enum: ['text', 'image'] }).notNull().default('text'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull()
@@ -63,7 +62,9 @@ export const questions = sqliteTable('questions', {
 export const questionOptions = sqliteTable('question_options', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   questionId: integer('question_id').notNull().references(() => questions.id, { onDelete: 'cascade' }),
-  optionText: text('option_text').notNull(),
+  // Exactly one of optionText / optionImagePath is set, matching the parent question's optionFormat.
+  optionText: text('option_text'),
+  optionImagePath: text('option_image_path'),
   isCorrect: integer('is_correct', { mode: 'boolean' }).notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0)
 }, table => [
@@ -137,7 +138,7 @@ export const quizSessionQuestions = sqliteTable('quiz_session_questions', {
   subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'restrict' }),
   sequenceIndex: integer('sequence_index').notNull(),
   selectedOptionId: integer('selected_option_id').references(() => questionOptions.id, { onDelete: 'set null' }),
-  submittedAnswerText: text('submitted_answer_text'),
+  submittedAnswerImagePath: text('submitted_answer_image_path'),
   isCorrect: integer('is_correct', { mode: 'boolean' }),
   hintUsed: integer('hint_used', { mode: 'boolean' }).notNull().default(false),
   flagged: integer('flagged', { mode: 'boolean' }).notNull().default(false),

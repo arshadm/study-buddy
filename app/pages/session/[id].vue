@@ -3,15 +3,17 @@ definePageMeta({ layout: 'student' })
 
 interface Question {
   sequenceIndex: number
-  type: 'multiple_choice' | 'free_response'
+  type: 'multiple_choice' | 'self_marked_image'
+  optionFormat: 'text' | 'image'
   imageUrl: string
   hintText: string | null
-  answerUnitHint: string | null
   selectedOptionId: number | null
-  submittedAnswerText: string | null
+  submittedAnswerImageUrl: string | null
+  workedSolutionImageUrl: string | null
+  selfMarkedCorrect: boolean | null
   hintUsed: boolean
   flagged: boolean
-  options: { id: number, optionText: string, sortOrder: number }[]
+  options: { id: number, optionText: string | null, optionImageUrl: string | null, sortOrder: number }[]
 }
 
 interface PaperContext {
@@ -109,7 +111,7 @@ async function goTo(index: number) {
   }
 }
 
-async function handleAnswer(payload: { selectedOptionId?: number, answerText?: string, hintUsed: boolean }) {
+async function handleAnswer(payload: { selectedOptionId?: number, selfMarkCorrect?: boolean, hintUsed: boolean }) {
   saving.value = true
   try {
     await $fetch(`/api/sessions/${sessionId.value}/answer`, {
@@ -120,10 +122,31 @@ async function handleAnswer(payload: { selectedOptionId?: number, answerText?: s
         clientElapsedMs: Date.now() - visitStartedAt.value
       }
     })
+    if (currentQuestion.value) currentQuestion.value.selfMarkedCorrect = payload.selfMarkCorrect ?? currentQuestion.value.selfMarkedCorrect
     const summary = questionSummaries.value.find(s => s.sequenceIndex === currentIndex.value)
     if (summary) summary.answered = true
   } catch {
     // ignore transient save errors — the student can still navigate, and re-selecting retries
+  } finally {
+    saving.value = false
+  }
+}
+
+async function uploadAnswerImage(file: File) {
+  if (!currentQuestion.value) return
+  saving.value = true
+  try {
+    const formData = new FormData()
+    formData.set('sequenceIndex', String(currentIndex.value))
+    formData.set('answerImage', file)
+    const result = await $fetch<{ submittedAnswerImageUrl: string, workedSolutionImageUrl: string | null }>(
+      `/api/sessions/${sessionId.value}/answer-image`,
+      { method: 'POST', body: formData }
+    )
+    currentQuestion.value.submittedAnswerImageUrl = result.submittedAnswerImageUrl
+    currentQuestion.value.workedSolutionImageUrl = result.workedSolutionImageUrl
+  } catch {
+    // ignore transient upload errors — the student can just try uploading again
   } finally {
     saving.value = false
   }
@@ -230,15 +253,17 @@ watch(sessionId, loadOverview)
         :type="currentQuestion.type"
         :image-url="currentQuestion.imageUrl"
         :hint-text="currentQuestion.hintText"
-        :answer-unit-hint="currentQuestion.answerUnitHint"
         :options="currentQuestion.options"
         :selected-option-id="currentQuestion.selectedOptionId"
-        :submitted-answer-text="currentQuestion.submittedAnswerText"
+        :submitted-answer-image-url="currentQuestion.submittedAnswerImageUrl"
+        :worked-solution-image-url="currentQuestion.workedSolutionImageUrl"
+        :self-marked-correct="currentQuestion.selfMarkedCorrect"
         :hint-used="currentQuestion.hintUsed"
         :flagged="currentQuestion.flagged"
         :saving="saving"
         @answer="handleAnswer"
         @toggle-flag="toggleFlag"
+        @upload-answer-image="uploadAnswerImage"
       />
 
       <div

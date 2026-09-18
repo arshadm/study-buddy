@@ -9,13 +9,9 @@ interface ExistingQuestion {
   workedSolutionImagePath: string | null
   hintText: string | null
   difficulty: number | null
-  type: 'multiple_choice' | 'free_response'
-  answerType: 'numeric' | 'text' | null
-  answerNumericValue: number | null
-  answerTolerancePercent: number | null
-  answerText: string | null
-  answerUnitHint: string | null
-  options: { id: number, optionText: string, isCorrect: boolean }[]
+  type: 'multiple_choice' | 'self_marked_image'
+  optionFormat: 'text' | 'image'
+  options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
 }
 
 const route = useRoute()

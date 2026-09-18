@@ -3,7 +3,8 @@ import { db } from '../../../database/client'
 import { questions, questionOptions, sections } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage } from '../../../utils/uploads'
-import { optionsSchema, parseQuestionType, parseDifficulty, parseFreeResponseFields, emptyFreeResponseFields } from '../../../utils/question-validation'
+import { parseQuestionType, parseOptionFormat, parseDifficulty } from '../../../utils/question-validation'
+import { buildQuestionOptions } from '../../../utils/build-question-options'
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, 'admin')
@@ -27,18 +28,13 @@ export default defineEventHandler(async (event) => {
 
   const type = parseQuestionType(fields)
   const difficulty = parseDifficulty(fields)
+  const optionFormat = type === 'multiple_choice' ? parseOptionFormat(fields) : 'text'
 
-  let options: { text: string, isCorrect: boolean }[] = []
-  let freeResponseFields = emptyFreeResponseFields
-
+  let options: Awaited<ReturnType<typeof buildQuestionOptions>> = []
   if (type === 'multiple_choice') {
-    try {
-      options = optionsSchema.parse(JSON.parse(fields.options || '[]'))
-    } catch (err) {
-      throw createError({ statusCode: 400, statusMessage: err instanceof Error ? err.message : 'Invalid options' })
-    }
-  } else {
-    freeResponseFields = parseFreeResponseFields(fields)
+    options = await buildQuestionOptions(optionFormat, fields, files)
+  } else if (!files.workedSolutionImage) {
+    throw createError({ statusCode: 400, statusMessage: 'A worked solution image is required for self-marked questions' })
   }
 
   const imagePath = await saveQuestionImage(files.image)
@@ -53,7 +49,7 @@ export default defineEventHandler(async (event) => {
     hintText: fields.hintText || null,
     difficulty,
     type,
-    ...freeResponseFields,
+    optionFormat,
     createdAt: now,
     updatedAt: now
   }).returning()
@@ -66,7 +62,8 @@ export default defineEventHandler(async (event) => {
     await db.insert(questionOptions).values(
       options.map((opt, index) => ({
         questionId: question.id,
-        optionText: opt.text,
+        optionText: opt.optionText,
+        optionImagePath: opt.optionImagePath,
         isCorrect: opt.isCorrect,
         sortOrder: index
       }))

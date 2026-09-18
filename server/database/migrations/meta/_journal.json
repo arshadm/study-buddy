@@ -22,6 +22,20 @@
       "when": 1789717004360,
       "tag": "0002_blue_hitman",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789726631279,
+      "tag": "0003_lowly_bloodaxe",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789726665117,
+      "tag": "0004_clever_brother_voodoo",
+      "breakpoints": true
     }
   ]
 }

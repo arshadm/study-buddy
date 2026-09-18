@@ -11,12 +11,10 @@ interface ReviewItem {
   flagged: boolean
   timeSpentMs: number | null
   isCorrect: boolean | null
-  type: 'multiple_choice' | 'free_response'
+  type: 'multiple_choice' | 'self_marked_image'
   selectedOptionId: number | null
-  submittedAnswerText: string | null
-  correctAnswerText: string | null
-  answerUnitHint: string | null
-  options: { id: number, optionText: string, isCorrect: boolean }[]
+  submittedAnswerImageUrl: string | null
+  options: { id: number, optionText: string | null, optionImageUrl: string | null, isCorrect: boolean }[]
 }
 
 interface ReviewResponse {

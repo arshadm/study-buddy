@@ -11,13 +11,9 @@ interface ExistingQuestion {
   workedSolutionImagePath: string | null
   hintText: string | null
   difficulty: number | null
-  type: 'multiple_choice' | 'free_response'
-  answerType: 'numeric' | 'text' | null
-  answerNumericValue: number | null
-  answerTolerancePercent: number | null
-  answerText: string | null
-  answerUnitHint: string | null
-  options: { id: number, optionText: string, isCorrect: boolean }[]
+  type: 'multiple_choice' | 'self_marked_image'
+  optionFormat: 'text' | 'image'
+  options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
 }
 
 const props = defineProps<{
@@ -53,18 +49,18 @@ watch(subjectId, async (newId, oldId) => {
 
 const hintText = ref(props.question?.hintText ?? '')
 const difficulty = ref<number | undefined>(props.question?.difficulty ?? undefined)
-const type = ref<'multiple_choice' | 'free_response'>(props.question?.type ?? 'multiple_choice')
+const type = ref<'multiple_choice' | 'self_marked_image'>(props.question?.type ?? 'multiple_choice')
+const optionFormat = ref<'text' | 'image'>(props.question?.optionFormat ?? 'text')
 
 const options = ref<OptionDraft[]>(
-  props.question?.options.map(o => ({ text: o.optionText, isCorrect: o.isCorrect }))
-  ?? [{ text: '', isCorrect: true }, { text: '', isCorrect: false }]
+  props.question?.options.map(o => ({
+    text: o.optionText ?? '',
+    isCorrect: o.isCorrect,
+    imageFile: null,
+    imagePreviewUrl: o.optionImagePath ? `/uploads/${o.optionImagePath}` : null
+  }))
+  ?? [{ text: '', isCorrect: true, imageFile: null, imagePreviewUrl: null }, { text: '', isCorrect: false, imageFile: null, imagePreviewUrl: null }]
 )
-
-const answerType = ref<'numeric' | 'text'>(props.question?.answerType ?? 'numeric')
-const answerNumericValue = ref<number | undefined>(props.question?.answerNumericValue ?? undefined)
-const answerTolerancePercent = ref<number | undefined>(props.question?.answerTolerancePercent ?? 2)
-const answerText = ref(props.question?.answerText ?? '')
-const answerUnitHint = ref(props.question?.answerUnitHint ?? '')
 
 const imageFile = ref<File | null>(null)
 const imagePreview = ref<string | null>(props.question ? `/uploads/${props.question.imagePath}` : null)
@@ -111,14 +107,16 @@ function validate(): string | null {
   if (!props.question && !imageFile.value) return 'A question image is required'
 
   if (type.value === 'multiple_choice') {
-    const filled = options.value.filter(o => o.text.trim())
-    if (filled.length < 2) return 'Add at least two options'
+    if (optionFormat.value === 'text') {
+      const filled = options.value.filter(o => o.text.trim())
+      if (filled.length < 2) return 'Add at least two options'
+    } else if (options.value.some(o => !o.imageFile && !o.imagePreviewUrl)) {
+      return 'Every option needs an image'
+    }
     if (!options.value.some(o => o.isCorrect)) return 'Mark one option as correct'
-  } else if (answerType.value === 'numeric') {
-    if (answerNumericValue.value === undefined || Number.isNaN(answerNumericValue.value)) return 'Enter the correct numeric answer'
-    if (answerTolerancePercent.value === undefined || answerTolerancePercent.value < 0) return 'Enter a tolerance percentage'
-  } else if (!answerText.value.trim()) {
-    return 'Enter the correct answer text'
+  } else {
+    const hasWorkedSolution = Boolean(workedSolutionFile.value) || (Boolean(workedSolutionPreview.value) && !removeWorkedSolution.value)
+    if (!hasWorkedSolution) return 'A worked solution image is required for self-marked questions'
   }
 
   return null
@@ -142,15 +140,19 @@ async function onSubmit() {
   else formData.set('difficulty', '')
 
   if (type.value === 'multiple_choice') {
-    formData.set('options', JSON.stringify(options.value.filter(o => o.text.trim())))
-  } else {
-    formData.set('answerType', answerType.value)
-    formData.set('answerUnitHint', answerUnitHint.value)
-    if (answerType.value === 'numeric') {
-      formData.set('answerNumericValue', String(answerNumericValue.value))
-      formData.set('answerTolerancePercent', String(answerTolerancePercent.value))
+    formData.set('optionFormat', optionFormat.value)
+
+    if (optionFormat.value === 'text') {
+      const filled = options.value.filter(o => o.text.trim())
+      formData.set('options', JSON.stringify(filled.map(o => ({ text: o.text, isCorrect: o.isCorrect }))))
     } else {
-      formData.set('answerText', answerText.value)
+      formData.set('options', JSON.stringify(options.value.map(o => ({
+        isCorrect: o.isCorrect,
+        existingImagePath: o.imageFile ? undefined : o.imagePreviewUrl?.replace(/^\/uploads\//, '')
+      }))))
+      options.value.forEach((opt, index) => {
+        if (opt.imageFile) formData.set(`optionImage_${index}`, opt.imageFile)
+      })
     }
   }
 
@@ -240,88 +242,47 @@ async function onSubmit() {
           @click="type = 'multiple_choice'"
         />
         <UButton
-          label="Free response"
-          :variant="type === 'free_response' ? 'solid' : 'subtle'"
-          :color="type === 'free_response' ? 'primary' : 'neutral'"
-          @click="type = 'free_response'"
+          label="Self-marked (image answer)"
+          :variant="type === 'self_marked_image' ? 'solid' : 'subtle'"
+          :color="type === 'self_marked_image' ? 'primary' : 'neutral'"
+          @click="type = 'self_marked_image'"
         />
       </div>
     </UFormField>
 
-    <UFormField
-      v-if="type === 'multiple_choice'"
-      label="Answer options"
-    >
-      <AdminQuestionOptionEditor v-model="options" />
-    </UFormField>
-
-    <template v-else>
-      <UFormField label="Answer type">
+    <template v-if="type === 'multiple_choice'">
+      <UFormField label="Option format">
         <div class="flex gap-2">
           <UButton
-            label="Numeric (with tolerance)"
-            :variant="answerType === 'numeric' ? 'solid' : 'subtle'"
-            :color="answerType === 'numeric' ? 'primary' : 'neutral'"
-            @click="answerType = 'numeric'"
+            label="Text"
+            :variant="optionFormat === 'text' ? 'solid' : 'subtle'"
+            :color="optionFormat === 'text' ? 'primary' : 'neutral'"
+            @click="optionFormat = 'text'"
           />
           <UButton
-            label="Exact text"
-            :variant="answerType === 'text' ? 'solid' : 'subtle'"
-            :color="answerType === 'text' ? 'primary' : 'neutral'"
-            @click="answerType = 'text'"
+            label="Image"
+            :variant="optionFormat === 'image' ? 'solid' : 'subtle'"
+            :color="optionFormat === 'image' ? 'primary' : 'neutral'"
+            @click="optionFormat = 'image'"
           />
         </div>
       </UFormField>
 
-      <div
-        v-if="answerType === 'numeric'"
-        class="grid grid-cols-2 gap-4"
-      >
-        <UFormField label="Correct value">
-          <UInputNumber
-            v-model="answerNumericValue"
-            class="w-full"
-          />
-        </UFormField>
-        <UFormField
-          label="Tolerance (%)"
-          hint="e.g. 2 allows ±2%"
-        >
-          <UInputNumber
-            v-model="answerTolerancePercent"
-            class="w-full"
-            :min="0"
-            :max="100"
-          />
-        </UFormField>
-      </div>
-
-      <UFormField
-        v-else
-        label="Correct answer"
-      >
-        <UInput
-          v-model="answerText"
-          class="w-full"
-        />
-        <p
-          v-if="answerText.includes('$')"
-          class="mt-1 text-sm text-muted"
-        >
-          <MathText :text="answerText" />
-        </p>
-      </UFormField>
-
-      <UFormField
-        label="Unit"
-        hint="Optional, shown next to the input (e.g. m/s), not validated"
-      >
-        <UInput
-          v-model="answerUnitHint"
-          class="w-full sm:w-48"
+      <UFormField label="Answer options">
+        <AdminQuestionOptionEditor
+          v-model="options"
+          :option-format="optionFormat"
         />
       </UFormField>
     </template>
+
+    <p
+      v-else
+      class="text-sm text-muted"
+    >
+      The student uploads a photo of their own working, then marks themselves right or wrong
+      against the worked solution below — so a worked solution image is required for this type.
+    </p>
 
     <UFormField
       label="Hint"
@@ -343,7 +304,7 @@ async function onSubmit() {
 
     <UFormField
       label="Worked solution image"
-      hint="Optional, shown to the student on the review page"
+      :hint="type === 'self_marked_image' ? 'Required — this is what the student checks their answer against' : 'Optional, shown to the student on the review page'"
     >
       <div class="space-y-3">
         <img

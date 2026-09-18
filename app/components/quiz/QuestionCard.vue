@@ -1,32 +1,34 @@
 <script setup lang="ts">
 interface Option {
   id: number
-  optionText: string
+  optionText: string | null
+  optionImageUrl: string | null
   sortOrder: number
 }
 
 const props = defineProps<{
-  type: 'multiple_choice' | 'free_response'
+  type: 'multiple_choice' | 'self_marked_image'
   imageUrl: string
   hintText: string | null
-  answerUnitHint: string | null
   options: Option[]
   selectedOptionId: number | null
-  submittedAnswerText: string | null
+  submittedAnswerImageUrl: string | null
+  workedSolutionImageUrl: string | null
+  selfMarkedCorrect: boolean | null
   hintUsed: boolean
   flagged: boolean
   saving: boolean
 }>()
 
 const emit = defineEmits<{
-  'answer': [payload: { selectedOptionId?: number, answerText?: string, hintUsed: boolean }]
+  'answer': [payload: { selectedOptionId?: number, selfMarkCorrect?: boolean, hintUsed: boolean }]
   'toggle-flag': []
+  'upload-answer-image': [file: File]
 }>()
 
 // Local copies seeded from props; the parent remounts this component (via :key)
 // whenever the question changes, so this only ever initializes once per question.
 const selectedOptionId = ref(props.selectedOptionId)
-const answerText = ref(props.submittedAnswerText ?? '')
 const hintRevealed = ref(props.hintUsed)
 
 function selectOption(optionId: number) {
@@ -34,17 +36,22 @@ function selectOption(optionId: number) {
   emit('answer', { selectedOptionId: optionId, hintUsed: hintRevealed.value })
 }
 
-function saveAnswerText() {
-  if (!answerText.value.trim()) return
-  emit('answer', { answerText: answerText.value, hintUsed: hintRevealed.value })
+function markSelf(correct: boolean) {
+  emit('answer', { selfMarkCorrect: correct, hintUsed: hintRevealed.value })
+}
+
+function onAnswerImageChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  emit('upload-answer-image', file)
 }
 
 function revealHint() {
   hintRevealed.value = true
   if (props.type === 'multiple_choice' && selectedOptionId.value !== null) {
     emit('answer', { selectedOptionId: selectedOptionId.value, hintUsed: true })
-  } else if (props.type === 'free_response' && answerText.value.trim()) {
-    emit('answer', { answerText: answerText.value, hintUsed: true })
+  } else if (props.type === 'self_marked_image' && props.selfMarkedCorrect !== null) {
+    emit('answer', { selfMarkCorrect: props.selfMarkedCorrect, hintUsed: true })
   }
 }
 </script>
@@ -73,28 +80,91 @@ function revealHint() {
           : 'border-default hover:border-muted'"
         @click="selectOption(option.id)"
       >
-        <MathText :text="option.optionText" />
+        <img
+          v-if="option.optionImageUrl"
+          :src="option.optionImageUrl"
+          alt="Answer option"
+          class="w-full h-28 object-contain bg-white rounded"
+        >
+        <MathText
+          v-else
+          :text="option.optionText"
+        />
       </button>
     </div>
 
     <div
       v-else
-      class="flex items-center gap-2 max-w-xs"
+      class="space-y-4"
     >
-      <UInput
-        v-model="answerText"
-        placeholder="Your answer"
-        size="lg"
-        class="w-full"
-        @blur="saveAnswerText"
-        @keyup.enter="saveAnswerText"
-      />
-      <span
-        v-if="answerUnitHint"
-        class="text-muted font-mono text-sm shrink-0"
+      <div
+        v-if="!submittedAnswerImageUrl"
+        class="space-y-2"
       >
-        <MathText :text="answerUnitHint" />
-      </span>
+        <p class="text-sm text-muted">
+          Upload a photo of your working
+        </p>
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          class="text-sm"
+          @change="onAnswerImageChange"
+        >
+      </div>
+
+      <template v-else>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <p class="text-xs font-mono text-muted mb-1">
+              Your answer
+            </p>
+            <img
+              :src="submittedAnswerImageUrl"
+              alt="Your submitted answer"
+              class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
+            >
+          </div>
+          <div v-if="workedSolutionImageUrl">
+            <p class="text-xs font-mono text-muted mb-1">
+              Worked solution
+            </p>
+            <img
+              :src="workedSolutionImageUrl"
+              alt="Worked solution"
+              class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
+            >
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <UButton
+            label="Got it right"
+            icon="i-lucide-check"
+            :variant="selfMarkedCorrect === true ? 'solid' : 'subtle'"
+            :color="selfMarkedCorrect === true ? 'success' : 'neutral'"
+            @click="markSelf(true)"
+          />
+          <UButton
+            label="Got it wrong"
+            icon="i-lucide-x"
+            :variant="selfMarkedCorrect === false ? 'solid' : 'subtle'"
+            :color="selfMarkedCorrect === false ? 'error' : 'neutral'"
+            @click="markSelf(false)"
+          />
+        </div>
+
+        <div>
+          <p class="text-xs text-muted mb-1">
+            Uploaded the wrong photo?
+          </p>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            class="text-sm"
+            @change="onAnswerImageChange"
+          >
+        </div>
+      </template>
     </div>
 
     <div class="flex items-center gap-4">

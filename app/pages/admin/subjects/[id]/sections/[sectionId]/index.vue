@@ -12,11 +12,9 @@ interface Question {
   imagePath: string
   hintText: string | null
   difficulty: number | null
-  type: 'multiple_choice' | 'free_response'
-  answerType: 'numeric' | 'text' | null
-  answerNumericValue: number | null
-  answerText: string | null
-  options: { id: number, optionText: string, isCorrect: boolean }[]
+  type: 'multiple_choice' | 'self_marked_image'
+  optionFormat: 'text' | 'image'
+  options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
 }
 
 const route = useRoute()
@@ -68,11 +66,8 @@ async function deleteQuestion(id: number) {
   await refreshQuestions()
 }
 
-function correctAnswer(question: Question) {
-  if (question.type === 'free_response') {
-    return question.answerType === 'numeric' ? String(question.answerNumericValue) : (question.answerText ?? '')
-  }
-  return question.options.find(o => o.isCorrect)?.optionText ?? ''
+function correctOption(question: Question) {
+  return question.options.find(o => o.isCorrect) ?? null
 }
 </script>
 
@@ -149,12 +144,27 @@ function correctAnswer(question: Question) {
             >
             <div class="min-w-0">
               <p class="text-xs font-mono text-muted flex items-center gap-2">
-                <span v-if="question.type === 'free_response'">Free response</span>
+                <span v-if="question.type === 'self_marked_image'">Self-marked</span>
+                <span v-else-if="question.optionFormat === 'image'">Multiple choice (image options)</span>
                 <span v-else>Multiple choice</span>
                 <span v-if="question.difficulty">· difficulty {{ question.difficulty }}</span>
               </p>
-              <p class="text-sm truncate">
-                Correct: <MathText :text="correctAnswer(question)" />
+              <p
+                v-if="question.type === 'multiple_choice'"
+                class="text-sm truncate flex items-center gap-2"
+              >
+                <template v-if="question.optionFormat === 'image'">
+                  Correct:
+                  <img
+                    v-if="correctOption(question)?.optionImagePath"
+                    :src="`/uploads/${correctOption(question)!.optionImagePath}`"
+                    alt="Correct option"
+                    class="h-8 object-contain bg-white rounded border border-default"
+                  >
+                </template>
+                <template v-else>
+                  Correct: <MathText :text="correctOption(question)?.optionText ?? ''" />
+                </template>
               </p>
               <p
                 v-if="question.hintText"

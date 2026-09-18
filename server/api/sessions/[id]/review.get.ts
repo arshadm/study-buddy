@@ -54,12 +54,13 @@ export default defineEventHandler(async (event) => {
       isCorrect: sq.isCorrect,
       type: question.type,
       selectedOptionId: sq.selectedOptionId,
-      submittedAnswerText: sq.submittedAnswerText,
-      correctAnswerText: question.type === 'free_response'
-        ? (question.answerType === 'numeric' ? String(question.answerNumericValue) : question.answerText)
-        : null,
-      answerUnitHint: question.answerUnitHint,
-      options: options.map(o => ({ id: o.id, optionText: o.optionText, isCorrect: o.isCorrect }))
+      submittedAnswerImageUrl: sq.submittedAnswerImagePath ? `/uploads/${sq.submittedAnswerImagePath}` : null,
+      options: options.map(o => ({
+        id: o.id,
+        optionText: o.optionText,
+        optionImageUrl: o.optionImagePath ? `/uploads/${o.optionImagePath}` : null,
+        isCorrect: o.isCorrect
+      }))
     }
   })
 

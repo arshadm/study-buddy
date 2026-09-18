@@ -3,7 +3,8 @@ import { db } from '../../../database/client'
 import { questions, questionOptions, sections } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage, deleteQuestionImage } from '../../../utils/uploads'
-import { optionsSchema, parseQuestionType, parseDifficulty, parseFreeResponseFields, emptyFreeResponseFields } from '../../../utils/question-validation'
+import { parseQuestionType, parseOptionFormat, parseDifficulty } from '../../../utils/question-validation'
+import { buildQuestionOptions } from '../../../utils/build-question-options'
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, 'admin')
@@ -30,21 +31,19 @@ export default defineEventHandler(async (event) => {
   if ('hintText' in fields) updates.hintText = fields.hintText || null
   if ('difficulty' in fields) updates.difficulty = parseDifficulty(fields)
 
-  let options: { text: string, isCorrect: boolean }[] | null = null
+  const resolvedType = fields.type ? parseQuestionType(fields) : existing.type
+  let newOptions: Awaited<ReturnType<typeof buildQuestionOptions>> | null = null
+  let clearOptions = false
 
   if (fields.type) {
-    const type = parseQuestionType(fields)
-    updates.type = type
+    updates.type = resolvedType
 
-    if (type === 'multiple_choice') {
-      try {
-        options = optionsSchema.parse(JSON.parse(fields.options || '[]'))
-      } catch (err) {
-        throw createError({ statusCode: 400, statusMessage: err instanceof Error ? err.message : 'Invalid options' })
-      }
-      Object.assign(updates, emptyFreeResponseFields)
+    if (resolvedType === 'multiple_choice') {
+      const optionFormat = parseOptionFormat(fields)
+      updates.optionFormat = optionFormat
+      newOptions = await buildQuestionOptions(optionFormat, fields, files)
     } else {
-      Object.assign(updates, parseFreeResponseFields(fields))
+      clearOptions = true
     }
   }
 
@@ -63,18 +62,36 @@ export default defineEventHandler(async (event) => {
     workedSolutionReplaced = true
   }
 
+  const resolvedWorkedSolution = workedSolutionReplaced ? updates.workedSolutionImagePath : existing.workedSolutionImagePath
+  if (resolvedType === 'self_marked_image' && !resolvedWorkedSolution) {
+    throw createError({ statusCode: 400, statusMessage: 'A worked solution image is required for self-marked questions' })
+  }
+
   await db.update(questions).set(updates).where(eq(questions.id, id))
 
-  if (options) {
+  let oldOptions: { optionImagePath: string | null }[] = []
+  if (newOptions || clearOptions) {
+    oldOptions = await db.select({ optionImagePath: questionOptions.optionImagePath }).from(questionOptions).where(eq(questionOptions.questionId, id))
     await db.delete(questionOptions).where(eq(questionOptions.questionId, id))
+  }
+
+  if (newOptions) {
     await db.insert(questionOptions).values(
-      options.map((opt, index) => ({
+      newOptions.map((opt, index) => ({
         questionId: id,
-        optionText: opt.text,
+        optionText: opt.optionText,
+        optionImagePath: opt.optionImagePath,
         isCorrect: opt.isCorrect,
         sortOrder: index
       }))
     )
+  }
+
+  const reusedImagePaths = new Set((newOptions ?? []).map(o => o.optionImagePath).filter((p): p is string => p !== null))
+  for (const opt of oldOptions) {
+    if (opt.optionImagePath && !reusedImagePaths.has(opt.optionImagePath)) {
+      await deleteQuestionImage(opt.optionImagePath)
+    }
   }
 
   if (newImagePath) {

@@ -2,12 +2,11 @@ import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../../../database/client'
 import { quizSessions, quizSessionQuestions, questionOptions, questions } from '../../../database/schema'
-import { checkFreeResponseAnswer } from '../../../utils/free-response'
 
 const bodySchema = z.object({
   sequenceIndex: z.number().int().min(0),
   selectedOptionId: z.number().int().optional(),
-  answerText: z.string().optional(),
+  selfMarkCorrect: z.boolean().optional(),
   hintUsed: z.boolean().default(false),
   clientElapsedMs: z.number().int().min(0)
 })
@@ -64,23 +63,21 @@ export default defineEventHandler(async (event) => {
 
     await db.update(quizSessionQuestions).set({
       selectedOptionId: option.id,
-      submittedAnswerText: null,
       isCorrect: option.isCorrect,
       hintUsed: body.hintUsed,
       timeSpentMs,
       answeredAt: now
     }).where(eq(quizSessionQuestions.id, current.id))
   } else {
-    if (body.answerText === undefined || body.answerText.trim() === '') {
-      throw createError({ statusCode: 400, statusMessage: 'answerText is required for this question' })
+    if (body.selfMarkCorrect === undefined) {
+      throw createError({ statusCode: 400, statusMessage: 'selfMarkCorrect is required for this question' })
+    }
+    if (!current.submittedAnswerImagePath) {
+      throw createError({ statusCode: 400, statusMessage: 'Upload your answer image before marking it' })
     }
 
-    const isCorrect = checkFreeResponseAnswer(question, body.answerText)
-
     await db.update(quizSessionQuestions).set({
-      selectedOptionId: null,
-      submittedAnswerText: body.answerText,
-      isCorrect,
+      isCorrect: body.selfMarkCorrect,
       hintUsed: body.hintUsed,
       timeSpentMs,
       answeredAt: now

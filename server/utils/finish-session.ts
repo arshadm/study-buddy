@@ -3,12 +3,13 @@ import { db } from '../database/client'
 import { quizSessions, quizSessionQuestions } from '../database/schema'
 
 export async function finishSession(sessionId: number) {
+  // isCorrect is the canonical "answered" signal for every question type — set on MCQ
+  // selection, and only on the self-marked verdict (not merely on uploading a photo).
   await db.update(quizSessionQuestions)
     .set({ isCorrect: false })
     .where(and(
       eq(quizSessionQuestions.quizSessionId, sessionId),
-      isNull(quizSessionQuestions.selectedOptionId),
-      isNull(quizSessionQuestions.submittedAnswerText)
+      isNull(quizSessionQuestions.isCorrect)
     ))
 
   const [totals] = await db.select({
