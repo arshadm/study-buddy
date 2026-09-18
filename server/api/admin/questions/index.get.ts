@@ -7,9 +7,11 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event)
   const subjectId = query.subjectId ? Number(query.subjectId) : undefined
+  const sectionId = query.sectionId ? Number(query.sectionId) : undefined
 
   const conditions = [eq(questions.isActive, true)]
   if (subjectId) conditions.push(eq(questions.subjectId, subjectId))
+  if (sectionId) conditions.push(eq(questions.sectionId, sectionId))
 
   const questionRows = await db.select().from(questions)
     .where(and(...conditions))

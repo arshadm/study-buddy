@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../../../database/client'
-import { questions, questionOptions } from '../../../database/schema'
+import { questions, questionOptions, sections } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage, deleteQuestionImage } from '../../../utils/uploads'
 import { optionsSchema, parseQuestionType, parseDifficulty, parseFreeResponseFields, emptyFreeResponseFields } from '../../../utils/question-validation'
@@ -18,7 +18,15 @@ export default defineEventHandler(async (event) => {
 
   const updates: Partial<typeof questions.$inferInsert> = { updatedAt: Date.now() }
 
-  if (fields.subjectId) updates.subjectId = Number(fields.subjectId)
+  if (fields.sectionId) {
+    const sectionId = Number(fields.sectionId)
+    const [section] = await db.select().from(sections).where(eq(sections.id, sectionId)).limit(1)
+    if (!section) {
+      throw createError({ statusCode: 400, statusMessage: 'Section not found' })
+    }
+    updates.sectionId = sectionId
+    updates.subjectId = section.subjectId
+  }
   if ('hintText' in fields) updates.hintText = fields.hintText || null
   if ('difficulty' in fields) updates.difficulty = parseDifficulty(fields)
 

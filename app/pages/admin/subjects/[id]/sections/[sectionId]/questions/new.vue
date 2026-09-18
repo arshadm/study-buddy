@@ -1,15 +1,17 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
-interface Subject { id: number, name: string }
+interface Section { id: number, name: string }
 
 const route = useRoute()
 const subjectId = route.params.id as string
+const sectionId = route.params.sectionId as string
 
-const { data: subject } = await useFetch<Subject>(`/api/admin/subjects/${subjectId}`)
+const { data: sections } = await useFetch<Section[]>(`/api/admin/subjects/${subjectId}/sections`)
+const section = computed(() => sections.value?.find(s => String(s.id) === sectionId) ?? null)
 
 async function onSaved() {
-  await navigateTo(`/admin/subjects/${subjectId}`)
+  await navigateTo(`/admin/subjects/${subjectId}/sections/${sectionId}`)
 }
 </script>
 
@@ -20,7 +22,7 @@ async function onSaved() {
         icon="i-lucide-arrow-left"
         variant="ghost"
         color="neutral"
-        :to="`/admin/subjects/${subjectId}`"
+        :to="`/admin/subjects/${subjectId}/sections/${sectionId}`"
       />
       <h1 class="text-2xl font-bold tracking-tight">
         New question
@@ -28,9 +30,9 @@ async function onSaved() {
     </div>
 
     <AdminQuestionForm
-      v-if="subject"
-      :fixed-subject-id="subject.id"
-      :fixed-subject-name="subject.name"
+      v-if="section"
+      :fixed-section-id="section.id"
+      :fixed-section-name="section.name"
       @saved="onSaved"
     />
   </div>

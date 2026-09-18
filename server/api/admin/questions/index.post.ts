@@ -1,5 +1,6 @@
+import { eq } from 'drizzle-orm'
 import { db } from '../../../database/client'
-import { questions, questionOptions } from '../../../database/schema'
+import { questions, questionOptions, sections } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage } from '../../../utils/uploads'
 import { optionsSchema, parseQuestionType, parseDifficulty, parseFreeResponseFields, emptyFreeResponseFields } from '../../../utils/question-validation'
@@ -9,10 +10,16 @@ export default defineEventHandler(async (event) => {
 
   const { fields, files } = await parseMultipartForm(event)
 
-  const subjectId = Number(fields.subjectId)
-  if (!subjectId) {
-    throw createError({ statusCode: 400, statusMessage: 'subjectId is required' })
+  const sectionId = Number(fields.sectionId)
+  if (!sectionId) {
+    throw createError({ statusCode: 400, statusMessage: 'sectionId is required' })
   }
+
+  const [section] = await db.select().from(sections).where(eq(sections.id, sectionId)).limit(1)
+  if (!section) {
+    throw createError({ statusCode: 400, statusMessage: 'Section not found' })
+  }
+  const subjectId = section.subjectId
 
   if (!files.image) {
     throw createError({ statusCode: 400, statusMessage: 'Question image is required' })
@@ -40,6 +47,7 @@ export default defineEventHandler(async (event) => {
 
   const [question] = await db.insert(questions).values({
     subjectId,
+    sectionId,
     imagePath,
     workedSolutionImagePath,
     hintText: fields.hintText || null,

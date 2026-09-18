@@ -4,9 +4,11 @@ import { eq } from 'drizzle-orm'
 import { db } from '../database/client'
 import { users } from '../database/schema'
 import { hashPasswordScrypt } from '../utils/hash-password'
+import { backfillUncategorizedQuestionsIntoSections } from '../utils/backfill-sections'
 
 export default defineNitroPlugin(async () => {
   migrate(db, { migrationsFolder: './server/database/migrations' })
+  await backfillUncategorizedQuestionsIntoSections()
 
   const [existingAdmin] = await db.select().from(users).where(eq(users.role, 'admin')).limit(1)
 

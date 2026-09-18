@@ -24,9 +24,24 @@ export const subjects = sqliteTable('subjects', {
   updatedAt: integer('updated_at').notNull()
 })
 
+export const sections = sqliteTable('sections', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull()
+}, table => [
+  uniqueIndex('idx_sections_subject_name').on(table.subjectId, table.name)
+])
+
 export const questions = sqliteTable('questions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
+  // Organizes questions for admin management only — students are still
+  // tested across the whole subject (all sections combined); every other
+  // query keeps filtering by subjectId, never sectionId.
+  sectionId: integer('section_id').references(() => sections.id, { onDelete: 'set null' }),
   imagePath: text('image_path').notNull(),
   hintText: text('hint_text'),
   workedSolutionImagePath: text('worked_solution_image_path'),
@@ -41,7 +56,8 @@ export const questions = sqliteTable('questions', {
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull()
 }, table => [
-  index('idx_questions_subject').on(table.subjectId, table.isActive)
+  index('idx_questions_subject').on(table.subjectId, table.isActive),
+  index('idx_questions_section').on(table.sectionId)
 ])
 
 export const questionOptions = sqliteTable('question_options', {

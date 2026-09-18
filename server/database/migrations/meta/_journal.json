@@ -15,6 +15,13 @@
       "when": 1789552948452,
       "tag": "0001_numerous_luke_cage",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789717004360,
+      "tag": "0002_blue_hitman",
+      "breakpoints": true
     }
   ]
 }

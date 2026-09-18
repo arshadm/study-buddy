@@ -2,9 +2,11 @@
 import type { OptionDraft } from './QuestionOptionEditor.vue'
 
 interface Subject { id: number, name: string }
+interface Section { id: number, name: string }
 interface ExistingQuestion {
   id: number
   subjectId: number
+  sectionId: number | null
   imagePath: string
   workedSolutionImagePath: string | null
   hintText: string | null
@@ -20,14 +22,35 @@ interface ExistingQuestion {
 
 const props = defineProps<{
   question?: ExistingQuestion | null
-  fixedSubjectId?: number
-  fixedSubjectName?: string
+  fixedSectionId?: number
+  fixedSectionName?: string
 }>()
 const emit = defineEmits<{ saved: [] }>()
 
-const { data: subjects } = await useFetch<Subject[]>('/api/admin/subjects', { immediate: !props.fixedSubjectId })
+const { data: subjects } = await useFetch<Subject[]>('/api/admin/subjects', { immediate: !props.fixedSectionId })
 
-const subjectId = ref<number | undefined>(props.fixedSubjectId ?? props.question?.subjectId)
+const subjectId = ref<number | undefined>(props.fixedSectionId ? undefined : props.question?.subjectId)
+const sectionId = ref<number | undefined>(props.fixedSectionId ?? props.question?.sectionId ?? undefined)
+const sectionsForSubject = ref<Section[]>([])
+
+// Plain $fetch doesn't forward the incoming request's cookies during SSR;
+// useRequestFetch does, which this needs since it can run at setup time.
+const requestFetch = useRequestFetch()
+
+async function loadSections(id: number | undefined) {
+  sectionsForSubject.value = id ? await requestFetch<Section[]>(`/api/admin/subjects/${id}/sections`) : []
+}
+
+if (!props.fixedSectionId) {
+  await loadSections(subjectId.value)
+}
+
+watch(subjectId, async (newId, oldId) => {
+  if (props.fixedSectionId || newId === oldId) return
+  await loadSections(newId)
+  sectionId.value = undefined
+})
+
 const hintText = ref(props.question?.hintText ?? '')
 const difficulty = ref<number | undefined>(props.question?.difficulty ?? undefined)
 const type = ref<'multiple_choice' | 'free_response'>(props.question?.type ?? 'multiple_choice')
@@ -84,7 +107,7 @@ function clearWorkedSolution() {
 }
 
 function validate(): string | null {
-  if (!subjectId.value) return 'Select a subject'
+  if (!sectionId.value) return 'Select a section'
   if (!props.question && !imageFile.value) return 'A question image is required'
 
   if (type.value === 'multiple_choice') {
@@ -112,7 +135,7 @@ async function onSubmit() {
   saving.value = true
 
   const formData = new FormData()
-  formData.set('subjectId', String(subjectId.value))
+  formData.set('sectionId', String(sectionId.value))
   formData.set('hintText', hintText.value)
   formData.set('type', type.value)
   if (difficulty.value) formData.set('difficulty', String(difficulty.value))
@@ -152,24 +175,33 @@ async function onSubmit() {
 
 <template>
   <div class="space-y-6">
-    <UFormField
-      v-if="!fixedSubjectId"
-      label="Subject"
-    >
-      <USelectMenu
-        v-model="subjectId"
-        :items="(subjects || []).map(s => ({ label: s.name, value: s.id }))"
-        value-key="value"
-        placeholder="Choose a subject"
-        class="w-full"
-      />
-    </UFormField>
+    <template v-if="!fixedSectionId">
+      <UFormField label="Subject">
+        <USelectMenu
+          v-model="subjectId"
+          :items="(subjects || []).map(s => ({ label: s.name, value: s.id }))"
+          value-key="value"
+          placeholder="Choose a subject"
+          class="w-full"
+        />
+      </UFormField>
+      <UFormField label="Section">
+        <USelectMenu
+          v-model="sectionId"
+          :items="sectionsForSubject.map(s => ({ label: s.name, value: s.id }))"
+          value-key="value"
+          :placeholder="subjectId ? 'Choose a section' : 'Choose a subject first'"
+          :disabled="!subjectId"
+          class="w-full"
+        />
+      </UFormField>
+    </template>
     <UFormField
       v-else
-      label="Subject"
+      label="Section"
     >
       <p class="text-sm">
-        {{ fixedSubjectName }}
+        {{ fixedSectionName }}
       </p>
     </UFormField>
 

@@ -4,6 +4,7 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 interface ExistingQuestion {
   id: number
   subjectId: number
+  sectionId: number | null
   imagePath: string
   workedSolutionImagePath: string | null
   hintText: string | null
@@ -19,15 +20,16 @@ interface ExistingQuestion {
 
 const route = useRoute()
 const subjectId = route.params.id as string
+const sectionId = route.params.sectionId as string
 const { data: question } = await useFetch<ExistingQuestion>(`/api/admin/questions/${route.params.questionId}`)
 
 async function onSaved() {
-  await navigateTo(`/admin/subjects/${subjectId}`)
+  await navigateTo(`/admin/subjects/${subjectId}/sections/${sectionId}`)
 }
 
 async function deleteQuestion() {
   await $fetch(`/api/admin/questions/${route.params.questionId}`, { method: 'DELETE' })
-  await navigateTo(`/admin/subjects/${subjectId}`)
+  await navigateTo(`/admin/subjects/${subjectId}/sections/${sectionId}`)
 }
 </script>
 
@@ -42,7 +44,7 @@ async function deleteQuestion() {
           icon="i-lucide-arrow-left"
           variant="ghost"
           color="neutral"
-          :to="`/admin/subjects/${subjectId}`"
+          :to="`/admin/subjects/${subjectId}/sections/${sectionId}`"
         />
         <h1 class="text-2xl font-bold tracking-tight">
           Edit question

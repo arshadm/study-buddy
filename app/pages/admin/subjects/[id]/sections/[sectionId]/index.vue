@@ -1,13 +1,10 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
-interface Subject {
+interface Section {
   id: number
   name: string
   description: string | null
-  defaultQuestionCount: number
-  defaultTimeLimitSeconds: number
-  isActive: boolean
 }
 
 interface Question {
@@ -24,23 +21,46 @@ interface Question {
 
 const route = useRoute()
 const subjectId = route.params.id as string
+const sectionId = route.params.sectionId as string
 
-const { data: subject, refresh: refreshSubject } = await useFetch<Subject>(`/api/admin/subjects/${subjectId}`)
+const { data: sections, refresh: refreshSection } = await useFetch<Section[]>(`/api/admin/subjects/${subjectId}/sections`)
+const section = computed(() => sections.value?.find(s => String(s.id) === sectionId) ?? null)
 const { data: questions, refresh: refreshQuestions } = await useFetch<Question[]>('/api/admin/questions', {
-  query: { subjectId }
+  query: { sectionId }
 })
 
 const editModalOpen = ref(false)
+const editName = ref('')
+const editDescription = ref('')
+const editError = ref('')
+const savingEdit = ref(false)
 
-async function onSubjectSaved() {
-  editModalOpen.value = false
-  await refreshSubject()
-}
+watch(section, (s) => {
+  if (s) {
+    editName.value = s.name
+    editDescription.value = s.description ?? ''
+  }
+}, { immediate: true })
 
-async function toggleActive() {
-  if (!subject.value) return
-  await $fetch(`/api/admin/subjects/${subjectId}`, { method: 'PATCH', body: { isActive: !subject.value.isActive } })
-  await refreshSubject()
+async function saveSection() {
+  if (!editName.value.trim()) {
+    editError.value = 'Name is required'
+    return
+  }
+  savingEdit.value = true
+  editError.value = ''
+  try {
+    await $fetch(`/api/admin/subjects/${subjectId}/sections/${sectionId}`, {
+      method: 'PATCH',
+      body: { name: editName.value, description: editDescription.value || null }
+    })
+    editModalOpen.value = false
+    await refreshSection()
+  } catch (err) {
+    editError.value = apiErrorMessage(err, 'Could not save section')
+  } finally {
+    savingEdit.value = false
+  }
 }
 
 async function deleteQuestion(id: number) {
@@ -58,7 +78,7 @@ function correctAnswer(question: Question) {
 
 <template>
   <div
-    v-if="subject"
+    v-if="section"
     class="max-w-3xl mx-auto space-y-8"
   >
     <div class="flex items-center gap-3">
@@ -66,33 +86,25 @@ function correctAnswer(question: Question) {
         icon="i-lucide-arrow-left"
         variant="ghost"
         color="neutral"
-        to="/admin/subjects"
+        :to="`/admin/subjects/${subjectId}`"
       />
       <div class="min-w-0 flex-1">
         <h1 class="text-2xl font-bold tracking-tight">
-          {{ subject.name }}
-          <span
-            v-if="!subject.isActive"
-            class="text-sm text-muted font-mono"
-          >(inactive)</span>
+          {{ section.name }}
         </h1>
-        <p class="text-sm text-muted">
-          {{ subject.defaultQuestionCount }} questions per session · {{ Math.round(subject.defaultTimeLimitSeconds / 60) }} min budget
+        <p
+          v-if="section.description"
+          class="text-sm text-muted"
+        >
+          {{ section.description }}
         </p>
       </div>
       <UButton
-        label="Edit settings"
+        label="Edit section"
         variant="subtle"
         color="neutral"
         size="sm"
         @click="editModalOpen = true"
-      />
-      <UButton
-        :label="subject.isActive ? 'Deactivate' : 'Activate'"
-        variant="ghost"
-        color="neutral"
-        size="sm"
-        @click="toggleActive"
       />
     </div>
 
@@ -105,7 +117,7 @@ function correctAnswer(question: Question) {
         <UButton
           label="Add question"
           icon="i-lucide-plus"
-          :to="`/admin/subjects/${subjectId}/questions/new`"
+          :to="`/admin/subjects/${subjectId}/sections/${sectionId}/questions/new`"
         />
       </div>
 
@@ -127,7 +139,7 @@ function correctAnswer(question: Question) {
         >
           <span class="w-6 text-right text-sm font-mono text-muted shrink-0">{{ index + 1 }}</span>
           <NuxtLink
-            :to="`/admin/subjects/${subjectId}/questions/${question.id}`"
+            :to="`/admin/subjects/${subjectId}/sections/${sectionId}/questions/${question.id}`"
             class="flex items-center gap-4 min-w-0 flex-1 hover:opacity-80 transition-opacity"
           >
             <img
@@ -166,13 +178,39 @@ function correctAnswer(question: Question) {
 
     <UModal
       v-model:open="editModalOpen"
-      title="Edit subject"
+      title="Edit section"
     >
       <template #body>
-        <AdminSubjectForm
-          :subject="subject"
-          @saved="onSubjectSaved"
-        />
+        <div class="space-y-4">
+          <UFormField label="Name">
+            <UInput
+              v-model="editName"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Description"
+            hint="Optional"
+          >
+            <UTextarea
+              v-model="editDescription"
+              class="w-full"
+              :rows="2"
+            />
+          </UFormField>
+          <p
+            v-if="editError"
+            class="text-sm text-error"
+          >
+            {{ editError }}
+          </p>
+          <UButton
+            label="Save"
+            block
+            :loading="savingEdit"
+            @click="saveSection"
+          />
+        </div>
       </template>
     </UModal>
   </div>
