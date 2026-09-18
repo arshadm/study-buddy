@@ -10,13 +10,18 @@ interface SubjectPerformance {
   subjectName: string
   windows: Record<string, { percent: number | null, questions: number }>
 }
+interface ProgressPoint { x: number, percent: number }
+interface StudentSeries { studentId: number, studentName: string, points: ProgressPoint[] }
+interface SubjectProgress { subjectId: number, subjectName: string, students: StudentSeries[] }
+interface Progress { papers: StudentSeries[], subjects: SubjectProgress[] }
 
-const [{ data: subjects }, { data: questions }, { data: students }, { data: papers }, { data: performance }] = await Promise.all([
+const [{ data: subjects }, { data: questions }, { data: students }, { data: papers }, { data: performance }, { data: progress }] = await Promise.all([
   useFetch<Subject[]>('/api/admin/subjects'),
   useFetch<Question[]>('/api/admin/questions'),
   useFetch<Student[]>('/api/admin/students'),
   useFetch<Paper[]>('/api/admin/papers'),
-  useFetch<SubjectPerformance[]>('/api/admin/stats/subject-performance')
+  useFetch<SubjectPerformance[]>('/api/admin/stats/subject-performance'),
+  useFetch<Progress>('/api/admin/stats/progress')
 ])
 
 const windowDays = [7, 14, 28] as const
@@ -115,6 +120,33 @@ const cards = computed(() => [
           </tbody>
         </table>
       </div>
+    </div>
+
+    <div class="space-y-3">
+      <h2 class="text-lg font-bold tracking-tight">
+        Progress
+      </h2>
+
+      <p
+        v-if="!progress?.papers.length && !progress?.subjects.length"
+        class="text-sm text-muted"
+      >
+        No completed sessions yet.
+      </p>
+
+      <template v-else>
+        <AdminProgressChart
+          v-if="progress?.papers.length"
+          title="Mock papers"
+          :series="progress.papers"
+        />
+        <AdminProgressChart
+          v-for="subject in progress?.subjects"
+          :key="subject.subjectId"
+          :title="subject.subjectName"
+          :series="subject.students"
+        />
+      </template>
     </div>
   </div>
 </template>
