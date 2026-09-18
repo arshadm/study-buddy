@@ -44,12 +44,16 @@ The database and uploaded images live in a named Docker volume (`study_buddy_dat
 `/data`, set via `STUDY_BUDDY_DATA_DIR`) so they survive every redeploy — a new image never touches
 existing data.
 
-Before deploying, export the secrets Kamal needs (see `.kamal/secrets`):
+Before deploying, export the one secret Kamal needs (see `.kamal/secrets`):
 
 ```bash
-export KAMAL_REGISTRY_PASSWORD=...              # Docker Hub password/token for artemissoft1
-export NUXT_SESSION_PASSWORD=$(openssl rand -base64 32)   # generate once, then keep it stable across deploys
+export KAMAL_REGISTRY_PASSWORD=...   # Docker Hub password/token for artemissoft1
 ```
+
+`NUXT_SESSION_PASSWORD` is hardwired directly in `config/deploy.yml` (`env.clear`) rather than
+treated as a secret — this app doesn't handle anything sensitive, so it's not worth the deploy-time
+export friction. If you ever want it out of version control, move it back to `.kamal/secrets` and
+`env.secret`.
 
 First-time setup (provisions the proxy, builds, and starts the app):
 

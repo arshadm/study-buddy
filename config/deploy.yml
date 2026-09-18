@@ -25,8 +25,11 @@ volumes:
   - "study_buddy_data:/data"
 
 env:
-  secret:
-    - NUXT_SESSION_PASSWORD
+  clear:
+    # Hardwired rather than a secret — this is a low-stakes family app, not
+    # worth the deploy-time env-export friction. Keep it stable across
+    # deploys (changing it invalidates everyone's logged-in session).
+    NUXT_SESSION_PASSWORD: "YeAQIFW7f+B9IdowVxzST/oYqi5M+PD+95mGTDkwJm0="
 
 registry:
   server: registry.hub.docker.com
