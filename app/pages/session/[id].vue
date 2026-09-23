@@ -251,6 +251,7 @@ watch(sessionId, loadOverview)
         v-if="currentQuestion"
         :key="currentQuestion.sequenceIndex"
         :type="currentQuestion.type"
+        :option-format="currentQuestion.optionFormat"
         :image-url="currentQuestion.imageUrl"
         :hint-text="currentQuestion.hintText"
         :options="currentQuestion.options"

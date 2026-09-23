@@ -69,6 +69,11 @@ async function deleteQuestion(id: number) {
 function correctOption(question: Question) {
   return question.options.find(o => o.isCorrect) ?? null
 }
+
+function correctLetter(question: Question) {
+  const index = question.options.findIndex(o => o.isCorrect)
+  return index >= 0 ? String.fromCharCode(97 + index) : ''
+}
 </script>
 
 <template>
@@ -154,7 +159,7 @@ function correctOption(question: Question) {
                 class="text-sm truncate flex items-center gap-2"
               >
                 <template v-if="question.optionFormat === 'image'">
-                  Correct:
+                  Correct: <span class="font-mono uppercase">{{ correctLetter(question) }}</span>
                   <img
                     v-if="correctOption(question)?.optionImagePath"
                     :src="`/uploads/${correctOption(question)!.optionImagePath}`"

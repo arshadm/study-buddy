@@ -268,7 +268,10 @@ async function onSubmit() {
         </div>
       </UFormField>
 
-      <UFormField label="Answer options">
+      <UFormField
+        label="Answer options"
+        :hint="optionFormat === 'image' ? 'Shown to the student in this exact order, labeled a/b/c/… — they answer by typing the letter' : undefined"
+      >
         <AdminQuestionOptionEditor
           v-model="options"
           :option-format="optionFormat"

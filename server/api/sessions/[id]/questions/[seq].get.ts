@@ -54,8 +54,11 @@ export default defineEventHandler(async (event) => {
       .where(eq(questionOptions.questionId, current.questionId))
       .orderBy(questionOptions.sortOrder)
 
-    // Randomized per session-question, but stable across repeated fetches (see seededShuffle).
-    options = seededShuffle(rows, current.id).map(o => ({
+    // Image options keep their authored order (labeled a/b/c/... by position) since the
+    // images themselves may already show those labels baked into the picture. Text options
+    // are randomized per session-question, but stable across repeated fetches (see seededShuffle).
+    const ordered = questionRow.optionFormat === 'image' ? rows : seededShuffle(rows, current.id)
+    options = ordered.map(o => ({
       id: o.id,
       optionText: o.optionText,
       optionImageUrl: o.optionImagePath ? `/uploads/${o.optionImagePath}` : null,

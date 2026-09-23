@@ -53,6 +53,7 @@ export default defineEventHandler(async (event) => {
       timeSpentMs: sq.timeSpentMs,
       isCorrect: sq.isCorrect,
       type: question.type,
+      optionFormat: question.optionFormat,
       selectedOptionId: sq.selectedOptionId,
       submittedAnswerImageUrl: sq.submittedAnswerImagePath ? `/uploads/${sq.submittedAnswerImagePath}` : null,
       options: options.map(o => ({

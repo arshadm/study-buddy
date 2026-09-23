@@ -62,6 +62,7 @@ function onImageChange(index: number, e: Event) {
           v-else
           class="flex items-center gap-2 w-full"
         >
+          <span class="text-xs font-mono text-muted uppercase shrink-0">{{ String.fromCharCode(97 + index) }}</span>
           <img
             v-if="option.imagePreviewUrl"
             :src="option.imagePreviewUrl"

@@ -17,6 +17,7 @@ const props = defineProps<{
     timeSpentMs: number | null
     isCorrect: boolean | null
     type: 'multiple_choice' | 'self_marked_image'
+    optionFormat: 'text' | 'image'
     selectedOptionId: number | null
     submittedAnswerImageUrl: string | null
     options: Option[]
@@ -84,7 +85,7 @@ const timeSpentLabel = computed(() => {
       class="grid gap-2 sm:grid-cols-2"
     >
       <div
-        v-for="option in item.options"
+        v-for="(option, optIndex) in item.options"
         :key="option.id"
         class="rounded-md border px-3 py-2 text-sm space-y-1"
         :class="[
@@ -94,8 +95,12 @@ const timeSpentLabel = computed(() => {
         ]"
       >
         <div class="flex items-center justify-between">
+          <span
+            v-if="item.optionFormat === 'image'"
+            class="text-xs font-mono text-muted uppercase"
+          >{{ String.fromCharCode(97 + optIndex) }}</span>
           <MathText
-            v-if="option.optionText"
+            v-else-if="option.optionText"
             :text="option.optionText"
           />
           <span v-else />

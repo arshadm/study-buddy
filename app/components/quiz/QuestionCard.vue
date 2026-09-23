@@ -8,6 +8,7 @@ interface Option {
 
 const props = defineProps<{
   type: 'multiple_choice' | 'self_marked_image'
+  optionFormat: 'text' | 'image'
   imageUrl: string
   hintText: string | null
   options: Option[]
@@ -30,6 +31,26 @@ const emit = defineEmits<{
 // whenever the question changes, so this only ever initializes once per question.
 const selectedOptionId = ref(props.selectedOptionId)
 const hintRevealed = ref(props.hintUsed)
+
+function letterForOptionId(id: number | null) {
+  if (id === null) return ''
+  const index = props.options.findIndex(o => o.id === id)
+  return index >= 0 ? String.fromCharCode(97 + index) : ''
+}
+
+// Image options aren't clickable — the images may carry their own baked-in
+// a/b/c/d labels, so the student answers by typing the letter instead.
+const imageLetterInput = ref(letterForOptionId(props.selectedOptionId))
+
+watch(imageLetterInput, (raw) => {
+  const letter = raw.trim().toLowerCase()
+  if (letter.length !== 1) return
+  const index = letter.charCodeAt(0) - 97
+  const option = props.options[index]
+  if (!option) return
+  selectedOptionId.value = option.id
+  emit('answer', { selectedOptionId: option.id, hintUsed: hintRevealed.value })
+})
 
 function selectOption(optionId: number) {
   selectedOptionId.value = optionId
@@ -67,7 +88,40 @@ function revealHint() {
     </div>
 
     <div
-      v-if="type === 'multiple_choice'"
+      v-if="type === 'multiple_choice' && optionFormat === 'image'"
+      class="space-y-4"
+    >
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div
+          v-for="(option, index) in options"
+          :key="option.id"
+          class="rounded-lg border border-default p-3 space-y-1"
+        >
+          <p class="text-xs font-mono text-muted uppercase">
+            {{ String.fromCharCode(97 + index) }}
+          </p>
+          <img
+            :src="option.optionImageUrl!"
+            alt="Answer option"
+            class="w-full h-28 object-contain bg-white rounded"
+          >
+        </div>
+      </div>
+      <UFormField
+        label="Your answer"
+        hint="Type the letter of the correct option"
+      >
+        <UInput
+          v-model="imageLetterInput"
+          placeholder="e.g. a"
+          maxlength="1"
+          class="w-24"
+        />
+      </UFormField>
+    </div>
+
+    <div
+      v-else-if="type === 'multiple_choice'"
       class="grid gap-3 sm:grid-cols-2"
     >
       <button
@@ -80,16 +134,7 @@ function revealHint() {
           : 'border-default hover:border-muted'"
         @click="selectOption(option.id)"
       >
-        <img
-          v-if="option.optionImageUrl"
-          :src="option.optionImageUrl"
-          alt="Answer option"
-          class="w-full h-28 object-contain bg-white rounded"
-        >
-        <MathText
-          v-else
-          :text="option.optionText"
-        />
+        <MathText :text="option.optionText" />
       </button>
     </div>
 
