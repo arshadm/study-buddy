@@ -3,7 +3,7 @@ import { db } from '../../../database/client'
 import { questions, questionOptions, sections } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage } from '../../../utils/uploads'
-import { parseQuestionType, parseOptionFormat, parseDifficulty } from '../../../utils/question-validation'
+import { parseQuestionType, parseOptionFormat, parseCorrectAnswerText, parseDifficulty } from '../../../utils/question-validation'
 import { buildQuestionOptions } from '../../../utils/build-question-options'
 
 export default defineEventHandler(async (event) => {
@@ -30,9 +30,12 @@ export default defineEventHandler(async (event) => {
   const difficulty = parseDifficulty(fields)
   const optionFormat = type === 'multiple_choice' ? parseOptionFormat(fields) : 'text'
 
-  let options: Awaited<ReturnType<typeof buildQuestionOptions>> = []
-  if (type === 'multiple_choice') {
-    options = await buildQuestionOptions(optionFormat, fields, files)
+  let options: ReturnType<typeof buildQuestionOptions> = []
+  let correctAnswerText: string | null = null
+  if (type === 'multiple_choice' && optionFormat === 'text') {
+    options = buildQuestionOptions(fields)
+  } else if (type === 'multiple_choice' && optionFormat === 'image') {
+    correctAnswerText = parseCorrectAnswerText(fields)
   } else if (!files.workedSolutionImage) {
     throw createError({ statusCode: 400, statusMessage: 'A worked solution image is required for self-marked questions' })
   }
@@ -50,6 +53,7 @@ export default defineEventHandler(async (event) => {
     difficulty,
     type,
     optionFormat,
+    correctAnswerText,
     createdAt: now,
     updatedAt: now
   }).returning()
@@ -58,7 +62,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Failed to create question' })
   }
 
-  if (type === 'multiple_choice') {
+  if (options.length > 0) {
     await db.insert(questionOptions).values(
       options.map((opt, index) => ({
         questionId: question.id,

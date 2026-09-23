@@ -14,6 +14,8 @@ interface ReviewItem {
   type: 'multiple_choice' | 'self_marked_image'
   optionFormat: 'text' | 'image'
   selectedOptionId: number | null
+  submittedAnswerText: string | null
+  correctAnswerText: string | null
   submittedAnswerImageUrl: string | null
   options: { id: number, optionText: string | null, optionImageUrl: string | null, isCorrect: boolean }[]
 }

@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
   }
 
   let options: { id: number, optionText: string | null, optionImageUrl: string | null, sortOrder: number }[] = []
-  if (questionRow.type === 'multiple_choice') {
+  if (questionRow.type === 'multiple_choice' && questionRow.optionFormat === 'text') {
     const rows = await db.select({
       id: questionOptions.id,
       optionText: questionOptions.optionText,
@@ -54,11 +54,8 @@ export default defineEventHandler(async (event) => {
       .where(eq(questionOptions.questionId, current.questionId))
       .orderBy(questionOptions.sortOrder)
 
-    // Image options keep their authored order (labeled a/b/c/... by position) since the
-    // images themselves may already show those labels baked into the picture. Text options
-    // are randomized per session-question, but stable across repeated fetches (see seededShuffle).
-    const ordered = questionRow.optionFormat === 'image' ? rows : seededShuffle(rows, current.id)
-    options = ordered.map(o => ({
+    // Randomized per session-question, but stable across repeated fetches (see seededShuffle).
+    options = seededShuffle(rows, current.id).map(o => ({
       id: o.id,
       optionText: o.optionText,
       optionImageUrl: o.optionImagePath ? `/uploads/${o.optionImagePath}` : null,
@@ -73,6 +70,7 @@ export default defineEventHandler(async (event) => {
     imageUrl: `/uploads/${questionRow.imagePath}`,
     hintText: questionRow.hintText,
     selectedOptionId: current.selectedOptionId,
+    submittedAnswerText: current.submittedAnswerText,
     submittedAnswerImageUrl: current.submittedAnswerImagePath ? `/uploads/${current.submittedAnswerImagePath}` : null,
     // Only reveal the worked solution once the student has submitted their own attempt.
     workedSolutionImageUrl: current.submittedAnswerImagePath && questionRow.workedSolutionImagePath

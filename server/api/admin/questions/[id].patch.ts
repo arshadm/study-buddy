@@ -3,7 +3,7 @@ import { db } from '../../../database/client'
 import { questions, questionOptions, sections } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage, deleteQuestionImage } from '../../../utils/uploads'
-import { parseQuestionType, parseOptionFormat, parseDifficulty } from '../../../utils/question-validation'
+import { parseQuestionType, parseOptionFormat, parseCorrectAnswerText, parseDifficulty } from '../../../utils/question-validation'
 import { buildQuestionOptions } from '../../../utils/build-question-options'
 
 export default defineEventHandler(async (event) => {
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
   if ('difficulty' in fields) updates.difficulty = parseDifficulty(fields)
 
   const resolvedType = fields.type ? parseQuestionType(fields) : existing.type
-  let newOptions: Awaited<ReturnType<typeof buildQuestionOptions>> | null = null
+  let newOptions: ReturnType<typeof buildQuestionOptions> | null = null
   let clearOptions = false
 
   if (fields.type) {
@@ -41,9 +41,16 @@ export default defineEventHandler(async (event) => {
     if (resolvedType === 'multiple_choice') {
       const optionFormat = parseOptionFormat(fields)
       updates.optionFormat = optionFormat
-      newOptions = await buildQuestionOptions(optionFormat, fields, files)
+      if (optionFormat === 'text') {
+        newOptions = buildQuestionOptions(fields)
+        updates.correctAnswerText = null
+      } else {
+        clearOptions = true
+        updates.correctAnswerText = parseCorrectAnswerText(fields)
+      }
     } else {
       clearOptions = true
+      updates.correctAnswerText = null
     }
   }
 

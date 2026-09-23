@@ -6,6 +6,7 @@ import { quizSessions, quizSessionQuestions, questionOptions, questions } from '
 const bodySchema = z.object({
   sequenceIndex: z.number().int().min(0),
   selectedOptionId: z.number().int().optional(),
+  submittedAnswerText: z.string().optional(),
   selfMarkCorrect: z.boolean().optional(),
   hintUsed: z.boolean().default(false),
   clientElapsedMs: z.number().int().min(0)
@@ -48,7 +49,22 @@ export default defineEventHandler(async (event) => {
   const serverElapsedMs = current.presentedAt ? now - current.presentedAt : body.clientElapsedMs
   const timeSpentMs = Math.max(0, Math.min(body.clientElapsedMs, serverElapsedMs))
 
-  if (question.type === 'multiple_choice') {
+  if (question.type === 'multiple_choice' && question.optionFormat === 'image') {
+    if (!body.submittedAnswerText || !body.submittedAnswerText.trim()) {
+      throw createError({ statusCode: 400, statusMessage: 'submittedAnswerText is required for this question' })
+    }
+
+    const submittedAnswerText = body.submittedAnswerText.trim()
+    const isCorrect = submittedAnswerText.toLowerCase() === (question.correctAnswerText ?? '').trim().toLowerCase()
+
+    await db.update(quizSessionQuestions).set({
+      submittedAnswerText,
+      isCorrect,
+      hintUsed: body.hintUsed,
+      timeSpentMs,
+      answeredAt: now
+    }).where(eq(quizSessionQuestions.id, current.id))
+  } else if (question.type === 'multiple_choice') {
     if (body.selectedOptionId === undefined) {
       throw createError({ statusCode: 400, statusMessage: 'selectedOptionId is required for this question' })
     }

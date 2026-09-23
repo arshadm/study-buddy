@@ -14,6 +14,7 @@ interface Question {
   difficulty: number | null
   type: 'multiple_choice' | 'self_marked_image'
   optionFormat: 'text' | 'image'
+  correctAnswerText: string | null
   options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
 }
 
@@ -68,11 +69,6 @@ async function deleteQuestion(id: number) {
 
 function correctOption(question: Question) {
   return question.options.find(o => o.isCorrect) ?? null
-}
-
-function correctLetter(question: Question) {
-  const index = question.options.findIndex(o => o.isCorrect)
-  return index >= 0 ? String.fromCharCode(97 + index) : ''
 }
 </script>
 
@@ -159,13 +155,7 @@ function correctLetter(question: Question) {
                 class="text-sm truncate flex items-center gap-2"
               >
                 <template v-if="question.optionFormat === 'image'">
-                  Correct: <span class="font-mono uppercase">{{ correctLetter(question) }}</span>
-                  <img
-                    v-if="correctOption(question)?.optionImagePath"
-                    :src="`/uploads/${correctOption(question)!.optionImagePath}`"
-                    alt="Correct option"
-                    class="h-8 object-contain bg-white rounded border border-default"
-                  >
+                  Correct: <span class="font-mono">{{ question.correctAnswerText }}</span>
                 </template>
                 <template v-else>
                   Correct: <MathText :text="correctOption(question)?.optionText ?? ''" />

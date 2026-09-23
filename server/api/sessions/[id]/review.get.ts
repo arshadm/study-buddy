@@ -55,6 +55,8 @@ export default defineEventHandler(async (event) => {
       type: question.type,
       optionFormat: question.optionFormat,
       selectedOptionId: sq.selectedOptionId,
+      submittedAnswerText: sq.submittedAnswerText,
+      correctAnswerText: question.type === 'multiple_choice' && question.optionFormat === 'image' ? question.correctAnswerText : null,
       submittedAnswerImageUrl: sq.submittedAnswerImagePath ? `/uploads/${sq.submittedAnswerImagePath}` : null,
       options: options.map(o => ({
         id: o.id,

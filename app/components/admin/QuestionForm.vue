@@ -13,6 +13,7 @@ interface ExistingQuestion {
   difficulty: number | null
   type: 'multiple_choice' | 'self_marked_image'
   optionFormat: 'text' | 'image'
+  correctAnswerText: string | null
   options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
 }
 
@@ -53,14 +54,10 @@ const type = ref<'multiple_choice' | 'self_marked_image'>(props.question?.type ?
 const optionFormat = ref<'text' | 'image'>(props.question?.optionFormat ?? 'text')
 
 const options = ref<OptionDraft[]>(
-  props.question?.options.map(o => ({
-    text: o.optionText ?? '',
-    isCorrect: o.isCorrect,
-    imageFile: null,
-    imagePreviewUrl: o.optionImagePath ? `/uploads/${o.optionImagePath}` : null
-  }))
-  ?? [{ text: '', isCorrect: true, imageFile: null, imagePreviewUrl: null }, { text: '', isCorrect: false, imageFile: null, imagePreviewUrl: null }]
+  props.question?.options.map(o => ({ text: o.optionText ?? '', isCorrect: o.isCorrect }))
+  ?? [{ text: '', isCorrect: true }, { text: '', isCorrect: false }]
 )
+const correctAnswerText = ref(props.question?.correctAnswerText ?? '')
 
 const imageFile = ref<File | null>(null)
 const imagePreview = ref<string | null>(props.question ? `/uploads/${props.question.imagePath}` : null)
@@ -110,10 +107,10 @@ function validate(): string | null {
     if (optionFormat.value === 'text') {
       const filled = options.value.filter(o => o.text.trim())
       if (filled.length < 2) return 'Add at least two options'
-    } else if (options.value.some(o => !o.imageFile && !o.imagePreviewUrl)) {
-      return 'Every option needs an image'
+      if (!options.value.some(o => o.isCorrect)) return 'Mark one option as correct'
+    } else if (!correctAnswerText.value.trim()) {
+      return 'Enter the correct answer'
     }
-    if (!options.value.some(o => o.isCorrect)) return 'Mark one option as correct'
   } else {
     const hasWorkedSolution = Boolean(workedSolutionFile.value) || (Boolean(workedSolutionPreview.value) && !removeWorkedSolution.value)
     if (!hasWorkedSolution) return 'A worked solution image is required for self-marked questions'
@@ -146,13 +143,7 @@ async function onSubmit() {
       const filled = options.value.filter(o => o.text.trim())
       formData.set('options', JSON.stringify(filled.map(o => ({ text: o.text, isCorrect: o.isCorrect }))))
     } else {
-      formData.set('options', JSON.stringify(options.value.map(o => ({
-        isCorrect: o.isCorrect,
-        existingImagePath: o.imageFile ? undefined : o.imagePreviewUrl?.replace(/^\/uploads\//, '')
-      }))))
-      options.value.forEach((opt, index) => {
-        if (opt.imageFile) formData.set(`optionImage_${index}`, opt.imageFile)
-      })
+      formData.set('correctAnswerText', correctAnswerText.value.trim())
     }
   }
 
@@ -269,12 +260,20 @@ async function onSubmit() {
       </UFormField>
 
       <UFormField
+        v-if="optionFormat === 'text'"
         label="Answer options"
-        :hint="optionFormat === 'image' ? 'Shown to the student in this exact order, labeled a/b/c/… — they answer by typing the letter' : undefined"
       >
-        <AdminQuestionOptionEditor
-          v-model="options"
-          :option-format="optionFormat"
+        <AdminQuestionOptionEditor v-model="options" />
+      </UFormField>
+      <UFormField
+        v-else
+        label="Correct answer"
+        hint="The question image already shows the options — the student types this to answer, matched case-insensitively (e.g. 'a')"
+      >
+        <UInput
+          v-model="correctAnswerText"
+          placeholder="e.g. a"
+          class="w-48"
         />
       </UFormField>
     </template>

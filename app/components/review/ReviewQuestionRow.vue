@@ -19,6 +19,8 @@ const props = defineProps<{
     type: 'multiple_choice' | 'self_marked_image'
     optionFormat: 'text' | 'image'
     selectedOptionId: number | null
+    submittedAnswerText: string | null
+    correctAnswerText: string | null
     submittedAnswerImageUrl: string | null
     options: Option[]
   }
@@ -81,11 +83,11 @@ const timeSpentLabel = computed(() => {
     >
 
     <div
-      v-if="item.type === 'multiple_choice'"
+      v-if="item.type === 'multiple_choice' && item.optionFormat === 'text'"
       class="grid gap-2 sm:grid-cols-2"
     >
       <div
-        v-for="(option, optIndex) in item.options"
+        v-for="option in item.options"
         :key="option.id"
         class="rounded-md border px-3 py-2 text-sm space-y-1"
         :class="[
@@ -95,12 +97,8 @@ const timeSpentLabel = computed(() => {
         ]"
       >
         <div class="flex items-center justify-between">
-          <span
-            v-if="item.optionFormat === 'image'"
-            class="text-xs font-mono text-muted uppercase"
-          >{{ String.fromCharCode(97 + optIndex) }}</span>
           <MathText
-            v-else-if="option.optionText"
+            v-if="option.optionText"
             :text="option.optionText"
           />
           <span v-else />
@@ -109,12 +107,20 @@ const timeSpentLabel = computed(() => {
             class="text-xs text-muted font-mono"
           >your answer</span>
         </div>
-        <img
-          v-if="option.optionImageUrl"
-          :src="option.optionImageUrl"
-          alt="Answer option"
-          class="w-full h-24 object-contain bg-white rounded"
-        >
+      </div>
+    </div>
+
+    <div
+      v-else-if="item.type === 'multiple_choice'"
+      class="grid gap-2 sm:grid-cols-2 text-sm"
+    >
+      <div>
+        <span class="text-xs text-muted font-mono block mb-1">Your answer</span>
+        <p>{{ item.submittedAnswerText ?? 'Not answered' }}</p>
+      </div>
+      <div>
+        <span class="text-xs text-muted font-mono block mb-1">Correct answer</span>
+        <p>{{ item.correctAnswerText }}</p>
       </div>
     </div>
 

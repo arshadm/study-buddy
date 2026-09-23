@@ -49,8 +49,12 @@ export const questions = sqliteTable('questions', {
   workedSolutionImagePath: text('worked_solution_image_path'),
   difficulty: integer('difficulty'),
   type: text('type', { enum: ['multiple_choice', 'self_marked_image'] }).notNull().default('multiple_choice'),
-  // Only meaningful when type is 'multiple_choice' — whether question_options carry text or images.
+  // Only meaningful when type is 'multiple_choice' — 'text' carries question_options rows,
+  // 'image' means the single question image already shows the options, and the correct
+  // answer is just the short label below (e.g. "a"), matched case-insensitively.
   optionFormat: text('option_format', { enum: ['text', 'image'] }).notNull().default('text'),
+  // Required (enforced in the API) when optionFormat is 'image'; unused otherwise.
+  correctAnswerText: text('correct_answer_text'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull()
@@ -139,6 +143,8 @@ export const quizSessionQuestions = sqliteTable('quiz_session_questions', {
   sequenceIndex: integer('sequence_index').notNull(),
   selectedOptionId: integer('selected_option_id').references(() => questionOptions.id, { onDelete: 'set null' }),
   submittedAnswerImagePath: text('submitted_answer_image_path'),
+  // The student's typed answer for a multiple_choice + optionFormat 'image' question.
+  submittedAnswerText: text('submitted_answer_text'),
   isCorrect: integer('is_correct', { mode: 'boolean' }),
   hintUsed: integer('hint_used', { mode: 'boolean' }).notNull().default(false),
   flagged: integer('flagged', { mode: 'boolean' }).notNull().default(false),

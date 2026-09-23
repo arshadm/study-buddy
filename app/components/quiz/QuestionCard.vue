@@ -13,6 +13,7 @@ const props = defineProps<{
   hintText: string | null
   options: Option[]
   selectedOptionId: number | null
+  submittedAnswerText: string | null
   submittedAnswerImageUrl: string | null
   workedSolutionImageUrl: string | null
   selfMarkedCorrect: boolean | null
@@ -22,7 +23,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'answer': [payload: { selectedOptionId?: number, selfMarkCorrect?: boolean, hintUsed: boolean }]
+  'answer': [payload: { selectedOptionId?: number, submittedAnswerText?: string, selfMarkCorrect?: boolean, hintUsed: boolean }]
   'toggle-flag': []
   'upload-answer-image': [file: File]
 }>()
@@ -32,24 +33,14 @@ const emit = defineEmits<{
 const selectedOptionId = ref(props.selectedOptionId)
 const hintRevealed = ref(props.hintUsed)
 
-function letterForOptionId(id: number | null) {
-  if (id === null) return ''
-  const index = props.options.findIndex(o => o.id === id)
-  return index >= 0 ? String.fromCharCode(97 + index) : ''
-}
+// The question image already shows the options for this format — the student
+// just types the answer (e.g. a letter) instead of clicking anything.
+const textAnswerInput = ref(props.submittedAnswerText ?? '')
 
-// Image options aren't clickable — the images may carry their own baked-in
-// a/b/c/d labels, so the student answers by typing the letter instead.
-const imageLetterInput = ref(letterForOptionId(props.selectedOptionId))
-
-watch(imageLetterInput, (raw) => {
-  const letter = raw.trim().toLowerCase()
-  if (letter.length !== 1) return
-  const index = letter.charCodeAt(0) - 97
-  const option = props.options[index]
-  if (!option) return
-  selectedOptionId.value = option.id
-  emit('answer', { selectedOptionId: option.id, hintUsed: hintRevealed.value })
+watch(textAnswerInput, (raw) => {
+  const trimmed = raw.trim()
+  if (!trimmed) return
+  emit('answer', { submittedAnswerText: trimmed, hintUsed: hintRevealed.value })
 })
 
 function selectOption(optionId: number) {
@@ -69,7 +60,9 @@ function onAnswerImageChange(e: Event) {
 
 function revealHint() {
   hintRevealed.value = true
-  if (props.type === 'multiple_choice' && selectedOptionId.value !== null) {
+  if (props.type === 'multiple_choice' && props.optionFormat === 'image' && textAnswerInput.value.trim()) {
+    emit('answer', { submittedAnswerText: textAnswerInput.value.trim(), hintUsed: true })
+  } else if (props.type === 'multiple_choice' && selectedOptionId.value !== null) {
     emit('answer', { selectedOptionId: selectedOptionId.value, hintUsed: true })
   } else if (props.type === 'self_marked_image' && props.selfMarkedCorrect !== null) {
     emit('answer', { selfMarkCorrect: props.selfMarkedCorrect, hintUsed: true })
@@ -87,35 +80,15 @@ function revealHint() {
       >
     </div>
 
-    <div
-      v-if="type === 'multiple_choice' && optionFormat === 'image'"
-      class="space-y-4"
-    >
-      <div class="grid gap-3 sm:grid-cols-2">
-        <div
-          v-for="(option, index) in options"
-          :key="option.id"
-          class="rounded-lg border border-default p-3 space-y-1"
-        >
-          <p class="text-xs font-mono text-muted uppercase">
-            {{ String.fromCharCode(97 + index) }}
-          </p>
-          <img
-            :src="option.optionImageUrl!"
-            alt="Answer option"
-            class="w-full h-28 object-contain bg-white rounded"
-          >
-        </div>
-      </div>
+    <div v-if="type === 'multiple_choice' && optionFormat === 'image'">
       <UFormField
         label="Your answer"
-        hint="Type the letter of the correct option"
+        hint="Type the correct option shown above"
       >
         <UInput
-          v-model="imageLetterInput"
+          v-model="textAnswerInput"
           placeholder="e.g. a"
-          maxlength="1"
-          class="w-24"
+          class="w-48"
         />
       </UFormField>
     </div>

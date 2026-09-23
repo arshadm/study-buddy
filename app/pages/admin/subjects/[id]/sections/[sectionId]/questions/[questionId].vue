@@ -11,6 +11,7 @@ interface ExistingQuestion {
   difficulty: number | null
   type: 'multiple_choice' | 'self_marked_image'
   optionFormat: 'text' | 'image'
+  correctAnswerText: string | null
   options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
 }
 
