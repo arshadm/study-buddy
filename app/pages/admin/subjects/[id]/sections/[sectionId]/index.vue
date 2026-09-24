@@ -290,8 +290,9 @@ function correctOption(question: Question) {
         <div class="space-y-4">
           <p class="text-sm text-muted">
             Upload a .zip containing your question images plus a <code>questions.csv</code> with
-            <code>image_filename</code> and <code>correct_answer</code> columns. Each row creates an
-            image-answer multiple choice question in this section.
+            <code>image_filename</code> and <code>correct_answer</code> columns, plus an optional
+            <code>explanation_image_filename</code> column (leave blank when there's no worked solution).
+            Each row creates an image-answer multiple choice question in this section.
           </p>
           <input
             type="file"

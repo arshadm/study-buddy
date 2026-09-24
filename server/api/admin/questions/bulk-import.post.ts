@@ -92,6 +92,11 @@ export default defineEventHandler(async (event) => {
     if (!correctAnswer) {
       errors.push(`Row ${rowNumber}: correct_answer is required`)
     }
+
+    const explanationFilename = row.explanation_image_filename?.trim()
+    if (explanationFilename && !imagesByName.has(explanationFilename)) {
+      errors.push(`Row ${rowNumber}: no explanation image named "${explanationFilename}" found in the zip`)
+    }
   })
 
   if (errors.length > 0) {
@@ -106,10 +111,21 @@ export default defineEventHandler(async (event) => {
     const type = EXTENSION_MIME[extensionOf(entry.entryName)]!
     const imagePath = await saveQuestionImage({ data: entry.getData(), type })
 
+    const explanationFilename = row.explanation_image_filename?.trim()
+    let workedSolutionImagePath: string | null = null
+    if (explanationFilename) {
+      const explanationEntry = imagesByName.get(explanationFilename)!
+      workedSolutionImagePath = await saveQuestionImage({
+        data: explanationEntry.getData(),
+        type: EXTENSION_MIME[extensionOf(explanationEntry.entryName)]!
+      })
+    }
+
     const [question] = await db.insert(questions).values({
       subjectId: section.subjectId,
       sectionId,
       imagePath,
+      workedSolutionImagePath,
       type: 'multiple_choice',
       optionFormat: 'image',
       correctAnswerText: row.correct_answer!.trim(),
