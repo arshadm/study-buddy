@@ -5,6 +5,8 @@ export function getDataDir() {
   const dir = resolve(process.env.STUDY_BUDDY_DATA_DIR || join(process.cwd(), '.data'))
   mkdirSync(join(dir, 'db'), { recursive: true })
   mkdirSync(join(dir, 'uploads', 'questions'), { recursive: true })
+  mkdirSync(join(dir, 'uploads', 'documents'), { recursive: true })
+  mkdirSync(join(dir, 'claude-home'), { recursive: true })
   return dir
 }
 

@@ -39,6 +39,12 @@ async function logout() {
               variant="ghost"
               color="neutral"
             />
+            <UButton
+              to="/discussions"
+              label="Discussions"
+              variant="ghost"
+              color="neutral"
+            />
           </nav>
         </div>
 

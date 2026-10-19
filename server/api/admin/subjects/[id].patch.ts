@@ -8,6 +8,7 @@ const bodySchema = z.object({
   description: z.string().max(500).nullable().optional(),
   defaultQuestionCount: z.number().int().min(1).max(200).optional(),
   defaultTimeLimitSeconds: z.number().int().min(30).max(24 * 60 * 60).optional(),
+  gradingInstructions: z.string().max(5000).nullable().optional(),
   isActive: z.boolean().optional()
 })
 

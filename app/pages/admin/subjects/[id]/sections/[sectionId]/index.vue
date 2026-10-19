@@ -18,6 +18,14 @@ interface Question {
   options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
 }
 
+interface OpenQuestionSet {
+  id: number
+  title: string
+  passageText: string | null
+  questions: { id: number }[]
+  needsReviewCount: number
+}
+
 const route = useRoute()
 const subjectId = route.params.id as string
 const sectionId = route.params.sectionId as string
@@ -25,6 +33,9 @@ const sectionId = route.params.sectionId as string
 const { data: sections, refresh: refreshSection } = await useFetch<Section[]>(`/api/admin/subjects/${subjectId}/sections`)
 const section = computed(() => sections.value?.find(s => String(s.id) === sectionId) ?? null)
 const { data: questions, refresh: refreshQuestions } = await useFetch<Question[]>('/api/admin/questions', {
+  query: { sectionId }
+})
+const { data: openQuestionSets, refresh: refreshOpenQuestionSets } = await useFetch<OpenQuestionSet[]>('/api/admin/open-question-sets', {
   query: { sectionId }
 })
 
@@ -65,6 +76,11 @@ async function saveSection() {
 async function deleteQuestion(id: number) {
   await $fetch(`/api/admin/questions/${id}`, { method: 'DELETE' })
   await refreshQuestions()
+}
+
+async function deleteOpenQuestionSet(id: number) {
+  await $fetch(`/api/admin/open-question-sets/${id}`, { method: 'DELETE' })
+  await refreshOpenQuestionSets()
 }
 
 const bulkModalOpen = ref(false)
@@ -239,6 +255,77 @@ function correctOption(question: Question) {
             size="sm"
             class="shrink-0"
             @click="deleteQuestion(question.id)"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold tracking-tight">
+          Discussion activities
+          <span class="text-muted font-normal text-sm">({{ openQuestionSets?.length ?? 0 }})</span>
+        </h2>
+        <UButton
+          label="Add activity"
+          icon="i-lucide-plus"
+          :to="`/admin/subjects/${subjectId}/sections/${sectionId}/open-question-sets/new`"
+        />
+      </div>
+
+      <p class="text-sm text-muted">
+        LLM-graded free-text question sets — the student's answers are judged against the
+        subject's syllabus, mark scheme and an optional chapter, with follow-up questions asked
+        until understanding is clear.
+      </p>
+
+      <p
+        v-if="!openQuestionSets?.length"
+        class="text-center py-16 text-muted"
+      >
+        No discussion activities yet.
+      </p>
+
+      <div
+        v-else
+        class="space-y-3"
+      >
+        <div
+          v-for="set in openQuestionSets"
+          :key="set.id"
+          class="rounded-lg border border-default p-3 flex items-center justify-between gap-4"
+        >
+          <NuxtLink
+            :to="`/admin/subjects/${subjectId}/sections/${sectionId}/open-question-sets/${set.id}`"
+            class="min-w-0 flex-1 hover:opacity-80 transition-opacity"
+          >
+            <p class="font-medium truncate">
+              {{ set.title }}
+            </p>
+            <p class="text-xs font-mono text-muted mt-1">
+              {{ set.questions.length }} question{{ set.questions.length === 1 ? '' : 's' }}
+              <span
+                v-if="set.needsReviewCount > 0"
+                class="text-warning"
+              > · {{ set.needsReviewCount }} need{{ set.needsReviewCount === 1 ? 's' : '' }} review</span>
+            </p>
+          </NuxtLink>
+          <UButton
+            label="Review"
+            icon="i-lucide-message-square-text"
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            class="shrink-0"
+            :to="`/admin/subjects/${subjectId}/sections/${sectionId}/open-question-sets/${set.id}/review`"
+          />
+          <UButton
+            icon="i-lucide-trash-2"
+            variant="ghost"
+            color="error"
+            size="sm"
+            class="shrink-0"
+            @click="deleteOpenQuestionSet(set.id)"
           />
         </div>
       </div>

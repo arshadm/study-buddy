@@ -39,6 +39,12 @@ async function logout() {
               variant="ghost"
               color="neutral"
             />
+            <UButton
+              to="/admin/test-grading"
+              label="Test grading"
+              variant="ghost"
+              color="neutral"
+            />
           </nav>
         </div>
 
@@ -57,8 +63,9 @@ async function logout() {
 
     <UContainer
       as="main"
-      class="py-10"
+      class="py-10 space-y-6"
     >
+      <AdminClaudeAuthBanner />
       <slot />
     </UContainer>
   </div>

@@ -74,7 +74,7 @@ export function getPaperAttemptsProgress(): StudentSeries[] {
 }
 
 export function getSubjectSessionsProgress(): SubjectProgress[] {
-  const rows = db.all<SubjectSessionRow>(sql`
+  const mcqRows = db.all<SubjectSessionRow>(sql`
     SELECT
       ssq.subject_id AS subject_id,
       sub.name AS subject_name,
@@ -92,6 +92,27 @@ export function getSubjectSessionsProgress(): SubjectProgress[] {
     GROUP BY ssq.subject_id, qs.id
     ORDER BY qs.started_at ASC
   `)
+
+  // One point per completed discussion-activity attempt — same shape as an MCQ session's point,
+  // so it can be merged straight into the same per-subject/per-student series.
+  const discussionRows = db.all<SubjectSessionRow>(sql`
+    SELECT
+      oqsa.subject_id AS subject_id,
+      sub.name AS subject_name,
+      oqsa.student_id AS student_id,
+      u.display_name AS student_name,
+      oqsa.started_at AS started_at,
+      SUM(CASE WHEN oqa.status = 'acceptable' THEN 1 ELSE 0 END) AS correct,
+      COUNT(*) AS total
+    FROM open_question_attempts oqa
+    INNER JOIN open_question_set_attempts oqsa ON oqsa.id = oqa.set_attempt_id AND oqsa.status = 'completed'
+    INNER JOIN users u ON u.id = oqsa.student_id
+    INNER JOIN subjects sub ON sub.id = oqsa.subject_id
+    GROUP BY oqsa.id
+    ORDER BY oqsa.started_at ASC
+  `)
+
+  const rows = [...mcqRows, ...discussionRows].sort((a, b) => a.started_at - b.started_at)
 
   const bySubject = new Map<number, { subjectName: string, rows: SubjectSessionRow[] }>()
   for (const row of rows) {

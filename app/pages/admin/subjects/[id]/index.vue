@@ -125,6 +125,17 @@ async function deleteSection(sectionId: number) {
     </div>
 
     <div class="space-y-3">
+      <h2 class="text-lg font-bold tracking-tight">
+        Resources
+      </h2>
+      <p class="text-sm text-muted">
+        Syllabus, mark scheme and textbook chapters used as context for LLM-graded discussion
+        activities in this subject.
+      </p>
+      <AdminSubjectDocuments :subject-id="subjectId" />
+    </div>
+
+    <div class="space-y-3">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-bold tracking-tight">
           Sections

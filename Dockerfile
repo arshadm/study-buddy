@@ -40,7 +40,15 @@ COPY --from=builder /app/server/database/migrations /app/server/database/migrati
 # Install production dependencies only (rebuilds native modules for this platform)
 RUN npm ci --omit=dev
 
-# Persistent SQLite database + uploaded question images live here (see .kamal deploy volume)
+# Claude Code CLI, used headlessly to grade discussion-activity answers (see
+# server/utils/claude-cli.ts). Logged in manually by the admin via `claude auth login` run
+# interactively inside the container — its credentials land under $HOME/.claude, and
+# server/utils/data-dir.ts points HOME at /data/claude-home for that subprocess so login
+# persists across redeploys exactly like the SQLite DB does.
+RUN npm install -g @anthropic-ai/claude-code
+
+# Persistent SQLite database + uploaded question/document files + Claude CLI login live here
+# (see .kamal deploy volume)
 ENV STUDY_BUDDY_DATA_DIR=/data
 VOLUME /data
 
