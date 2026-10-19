@@ -2,7 +2,10 @@
 
 A self-hosted practice app for the Cambridge ESAT: pick subjects, take a timed multiple-choice
 session, and review results afterwards. Questions you've previously gotten wrong (or been slow on)
-are weighted to come up more often in later sessions.
+are weighted to come up more often in later sessions. Subjects like Psychology also support
+LLM-graded discussion activities — free-text questions judged for understanding (with follow-up
+questions) rather than a fixed answer key; see "Claude CLI login" below for the one-time setup
+these need.
 
 Built with Nuxt 3, Nuxt UI, SQLite (via Drizzle ORM), and `nuxt-auth-utils` for login.
 
@@ -69,6 +72,29 @@ kamal deploy
 
 Useful commands: `kamal app logs`, `kamal app exec -i bash` (to run `npm run create-admin` inside
 the running container), `kamal rollback`.
+
+### Claude CLI login (for discussion activities)
+
+LLM-graded discussion activities (see below) grade answers via the Claude Code CLI, running
+headlessly inside the container and authenticated with your own Claude account rather than API
+billing. The image has the CLI installed, but **you need to log it in once after first deploying**
+(and again any time the admin dashboard shows a "Claude CLI needs re-authentication" banner):
+
+```bash
+kamal app exec -i "claude auth login --claudeai"
+```
+
+This prints an OAuth URL — open it on any device (it doesn't need to be the server), complete
+sign-in, then paste the resulting code back into the terminal. Credentials are stored under
+`claude-home/` inside the same persistent `/data` volume as the database, so login survives every
+future redeploy; you only need to repeat this if the login itself expires or is revoked.
+
+To check current status without waiting for a grading call to fail, either look for the banner on
+the admin dashboard (it has a "Check now" button), or run directly:
+
+```bash
+kamal app exec -i "claude auth status --json"
+```
 
 ### Manual / bare-metal alternative
 
