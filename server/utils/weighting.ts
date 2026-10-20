@@ -10,14 +10,24 @@ const SLOWNESS_THRESHOLD_MULTIPLIER = 1.3
 const SLOWNESS_FACTOR = 1.25
 const UNSEEN_BOOST = 1.2
 const DIFFICULTY_DISTANCE_PENALTY = 0.25
+// Applied to the student's wrong-rate (0..1) within a question's section ("category") — same
+// shape as WRONG_ATTEMPT_WEIGHT but at category granularity, on top of the question's own factor.
+const CATEGORY_WRONG_WEIGHT = 1.5
 
 interface QuestionStatsRow {
   questionId: number
+  sectionId: number | null
   timesSeen: number
   timesWrong: number
   lastSeenAt: number | null
   avgCorrectTimeMs: number | null
   difficulty: number | null
+}
+
+export interface CategoryStatsRow {
+  sectionId: number
+  timesSeen: number
+  timesWrong: number
 }
 
 interface WeightedQuestion {
@@ -28,6 +38,7 @@ interface WeightedQuestion {
 export function getQuestionStats(studentId: number, subjectId: number): QuestionStatsRow[] {
   const rows = db.all<{
     question_id: number
+    section_id: number | null
     times_seen: number
     times_wrong: number
     last_seen_at: number | null
@@ -36,6 +47,7 @@ export function getQuestionStats(studentId: number, subjectId: number): Question
   }>(sql`
     SELECT
       q.id AS question_id,
+      q.section_id AS section_id,
       q.difficulty AS difficulty,
       COUNT(ssq.id) AS times_seen,
       SUM(CASE WHEN ssq.is_correct = 0 THEN 1 ELSE 0 END) AS times_wrong,
@@ -50,11 +62,35 @@ export function getQuestionStats(studentId: number, subjectId: number): Question
 
   return rows.map(r => ({
     questionId: r.question_id,
+    sectionId: r.section_id,
     timesSeen: r.times_seen ?? 0,
     timesWrong: r.times_wrong ?? 0,
     lastSeenAt: r.last_seen_at,
     avgCorrectTimeMs: r.avg_correct_time_ms,
     difficulty: r.difficulty
+  }))
+}
+
+// Per-section ("category") stats for a student within a subject — same signal as question
+// stats (times seen/wrong), aggregated one level up, used to boost questions from sections the
+// student is weak in even if that specific question hasn't been seen/gotten wrong before.
+export function getCategoryStats(studentId: number, subjectId: number): CategoryStatsRow[] {
+  const rows = db.all<{ section_id: number, times_seen: number, times_wrong: number }>(sql`
+    SELECT
+      q.section_id AS section_id,
+      COUNT(ssq.id) AS times_seen,
+      SUM(CASE WHEN ssq.is_correct = 0 THEN 1 ELSE 0 END) AS times_wrong
+    FROM ${questions} q
+    LEFT JOIN ${quizSessionQuestions} ssq ON ssq.question_id = q.id
+    LEFT JOIN ${quizSessions} s ON s.id = ssq.quiz_session_id AND s.student_id = ${studentId} AND s.status = 'completed'
+    WHERE q.subject_id = ${subjectId} AND q.is_active = 1 AND q.section_id IS NOT NULL
+    GROUP BY q.section_id
+  `)
+
+  return rows.map(r => ({
+    sectionId: r.section_id,
+    timesSeen: r.times_seen ?? 0,
+    timesWrong: r.times_wrong ?? 0
   }))
 }
 
@@ -74,7 +110,10 @@ function computeTargetDifficulty(stats: QuestionStatsRow[]): number {
   return 5
 }
 
-export function computeWeight(stats: QuestionStatsRow, expectedTimePerQuestionMs: number, targetDifficulty: number): number {
+// categoryWrongRate: the student's wrong-rate (0..1) within this question's section, or 0 when
+// the question is uncategorized (no sectionId) or the category has no history yet — a neutral
+// factor of 1 either way.
+export function computeWeight(stats: QuestionStatsRow, expectedTimePerQuestionMs: number, targetDifficulty: number, categoryWrongRate: number): number {
   const wrongFactor = 1 + stats.timesWrong * WRONG_ATTEMPT_WEIGHT
 
   let recencyBoost = 1.0
@@ -96,7 +135,9 @@ export function computeWeight(stats: QuestionStatsRow, expectedTimePerQuestionMs
     ? 1.0
     : 1 / (1 + Math.abs(stats.difficulty - targetDifficulty) * DIFFICULTY_DISTANCE_PENALTY)
 
-  return wrongFactor * recencyBoost * slownessFactor * unseenBoost * difficultyFactor
+  const categoryFactor = 1 + categoryWrongRate * CATEGORY_WRONG_WEIGHT
+
+  return wrongFactor * recencyBoost * slownessFactor * unseenBoost * difficultyFactor * categoryFactor
 }
 
 export function weightedSampleWithoutReplacement(items: WeightedQuestion[], n: number): number[] {
@@ -120,7 +161,14 @@ export function weightedSampleWithoutReplacement(items: WeightedQuestion[], n: n
 
 export function pickWeightedQuestionsForSubject(studentId: number, subjectId: number, count: number, expectedTimePerQuestionMs: number): number[] {
   const stats = getQuestionStats(studentId, subjectId)
+  const categoryStatsBySection = new Map(getCategoryStats(studentId, subjectId).map(c => [c.sectionId, c]))
   const targetDifficulty = computeTargetDifficulty(stats)
-  const weighted = stats.map(s => ({ id: s.questionId, weight: computeWeight(s, expectedTimePerQuestionMs, targetDifficulty) }))
+
+  const weighted = stats.map((s) => {
+    const categoryStats = s.sectionId !== null ? categoryStatsBySection.get(s.sectionId) : undefined
+    const categoryWrongRate = categoryStats && categoryStats.timesSeen > 0 ? categoryStats.timesWrong / categoryStats.timesSeen : 0
+    return { id: s.questionId, weight: computeWeight(s, expectedTimePerQuestionMs, targetDifficulty, categoryWrongRate) }
+  })
+
   return weightedSampleWithoutReplacement(weighted, count)
 }
