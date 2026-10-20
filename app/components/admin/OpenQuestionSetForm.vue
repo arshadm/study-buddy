@@ -3,12 +3,10 @@ interface ExistingSet {
   id: number
   subjectId: number
   sectionId: number | null
-  chapterDocumentId: number | null
   title: string
   passageText: string | null
   questions: { id: number, promptText: string }[]
 }
-interface DocumentRow { id: number, role: 'syllabus' | 'mark_scheme' | 'chapter', title: string }
 interface QuestionDraft { id?: number, promptText: string }
 
 const props = defineProps<{
@@ -19,11 +17,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ saved: [] }>()
 
-const { data: documents } = await useFetch<DocumentRow[]>(`/api/admin/subjects/${props.subjectId}/documents`)
-const chapters = computed(() => documents.value?.filter(d => d.role === 'chapter') ?? [])
-
 const title = ref(props.set?.title ?? '')
-const chapterDocumentId = ref<number | undefined>(props.set?.chapterDocumentId ?? undefined)
 const passageText = ref(props.set?.passageText ?? '')
 const questions = ref<QuestionDraft[]>(
   props.set?.questions.map(q => ({ id: q.id, promptText: q.promptText })) ?? [{ promptText: '' }]
@@ -67,7 +61,6 @@ async function onSubmit() {
 
   const body = {
     sectionId: props.sectionId,
-    chapterDocumentId: chapterDocumentId.value ?? null,
     title: title.value.trim(),
     passageText: passageText.value.trim() || null,
     questions: questions.value
@@ -103,19 +96,6 @@ async function onSubmit() {
         v-model="title"
         class="w-full"
         placeholder="e.g. Chapter 4 comprehension check"
-      />
-    </UFormField>
-
-    <UFormField
-      label="Based on chapter"
-      hint="Optional — sent to the grader as context"
-    >
-      <USelectMenu
-        v-model="chapterDocumentId"
-        :items="chapters.map(c => ({ label: c.title, value: c.id }))"
-        value-key="value"
-        placeholder="No chapter"
-        class="w-full"
       />
     </UFormField>
 

@@ -5,7 +5,10 @@ interface Section {
   id: number
   name: string
   description: string | null
+  chapterDocumentId: number | null
 }
+
+interface DocumentRow { id: number, role: 'syllabus' | 'mark_scheme' | 'chapter', title: string }
 
 interface Question {
   id: number
@@ -38,10 +41,15 @@ const { data: questions, refresh: refreshQuestions } = await useFetch<Question[]
 const { data: openQuestionSets, refresh: refreshOpenQuestionSets } = await useFetch<OpenQuestionSet[]>('/api/admin/open-question-sets', {
   query: { sectionId }
 })
+const { data: documents } = await useFetch<DocumentRow[]>(`/api/admin/subjects/${subjectId}/documents`)
+
+const chapters = computed(() => documents.value?.filter(d => d.role === 'chapter') ?? [])
+const chapterTitle = computed(() => chapters.value.find(c => c.id === section.value?.chapterDocumentId)?.title ?? null)
 
 const editModalOpen = ref(false)
 const editName = ref('')
 const editDescription = ref('')
+const editChapterDocumentId = ref<number | undefined>(undefined)
 const editError = ref('')
 const savingEdit = ref(false)
 
@@ -49,6 +57,7 @@ watch(section, (s) => {
   if (s) {
     editName.value = s.name
     editDescription.value = s.description ?? ''
+    editChapterDocumentId.value = s.chapterDocumentId ?? undefined
   }
 }, { immediate: true })
 
@@ -62,7 +71,7 @@ async function saveSection() {
   try {
     await $fetch(`/api/admin/subjects/${subjectId}/sections/${sectionId}`, {
       method: 'PATCH',
-      body: { name: editName.value, description: editDescription.value || null }
+      body: { name: editName.value, description: editDescription.value || null, chapterDocumentId: editChapterDocumentId.value ?? null }
     })
     editModalOpen.value = false
     await refreshSection()
@@ -163,6 +172,12 @@ function correctOption(question: Question) {
           class="text-sm text-muted"
         >
           {{ section.description }}
+        </p>
+        <p
+          v-if="chapterTitle"
+          class="text-xs font-mono text-muted mt-1"
+        >
+          Chapter: {{ chapterTitle }}
         </p>
       </div>
       <UButton
@@ -351,6 +366,18 @@ function correctOption(question: Question) {
               v-model="editDescription"
               class="w-full"
               :rows="2"
+            />
+          </UFormField>
+          <UFormField
+            label="Chapter"
+            hint="Optional — its text is sent as context to the LLM grader for any discussion activities in this section"
+          >
+            <USelectMenu
+              v-model="editChapterDocumentId"
+              :items="chapters.map(c => ({ label: c.title, value: c.id }))"
+              value-key="value"
+              placeholder="No chapter"
+              class="w-full"
             />
           </UFormField>
           <p

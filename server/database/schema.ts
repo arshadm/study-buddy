@@ -30,6 +30,10 @@ export const sections = sqliteTable('sections', {
   subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   description: text('description'),
+  // The textbook chapter this section belongs to — its extracted text is sent as LLM grading
+  // context for any discussion-activity question set filed under this section. Nullable: a
+  // section can stand alone with no chapter.
+  chapterDocumentId: integer('chapter_document_id').references(() => documents.id, { onDelete: 'set null' }),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull()
 }, table => [
@@ -184,8 +188,6 @@ export const openQuestionSets = sqliteTable('open_question_sets', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
   sectionId: integer('section_id').references(() => sections.id, { onDelete: 'set null' }),
-  // The chapter this set is based on, sent as LLM grading context. Nullable — a set can stand alone.
-  chapterDocumentId: integer('chapter_document_id').references(() => documents.id, { onDelete: 'set null' }),
   title: text('title').notNull(),
   // Optional excerpt shown to the student before the first question.
   passageText: text('passage_text'),

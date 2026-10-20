@@ -1,11 +1,12 @@
 import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../../../../../database/client'
-import { sections } from '../../../../../database/schema'
+import { sections, documents } from '../../../../../database/schema'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  description: z.string().max(500).nullable().optional()
+  description: z.string().max(500).nullable().optional(),
+  chapterDocumentId: z.number().int().nullable().optional()
 })
 
 export default defineEventHandler(async (event) => {
@@ -13,6 +14,15 @@ export default defineEventHandler(async (event) => {
   const subjectId = Number(getRouterParam(event, 'id'))
   const sectionId = Number(getRouterParam(event, 'sectionId'))
   const body = await readValidatedBody(event, bodySchema.parse)
+
+  if (body.chapterDocumentId) {
+    const [chapter] = await db.select().from(documents)
+      .where(and(eq(documents.id, body.chapterDocumentId), eq(documents.subjectId, subjectId), eq(documents.role, 'chapter')))
+      .limit(1)
+    if (!chapter) {
+      throw createError({ statusCode: 400, statusMessage: 'Chapter document not found for this subject' })
+    }
+  }
 
   try {
     const [section] = await db.update(sections)

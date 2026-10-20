@@ -6,7 +6,6 @@ interface ExistingSet {
   id: number
   subjectId: number
   sectionId: number | null
-  chapterDocumentId: number | null
   title: string
   passageText: string | null
   questions: { id: number, promptText: string }[]

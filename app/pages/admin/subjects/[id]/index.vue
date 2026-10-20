@@ -12,6 +12,7 @@ interface Section {
   id: number
   name: string
   description: string | null
+  chapterDocumentId: number | null
 }
 
 interface Question {
@@ -19,17 +20,24 @@ interface Question {
   sectionId: number | null
 }
 
+interface DocumentRow { id: number, role: 'syllabus' | 'mark_scheme' | 'chapter', title: string }
+
 const route = useRoute()
 const subjectId = route.params.id as string
 
 const { data: subject, refresh: refreshSubject } = await useFetch<Subject>(`/api/admin/subjects/${subjectId}`)
 const { data: sectionList, refresh: refreshSections } = await useFetch<Section[]>(`/api/admin/subjects/${subjectId}/sections`)
 const { data: questions } = await useFetch<Question[]>('/api/admin/questions', { query: { subjectId } })
+const { data: documents } = await useFetch<DocumentRow[]>(`/api/admin/subjects/${subjectId}/documents`)
+
+const chapters = computed(() => documents.value?.filter(d => d.role === 'chapter') ?? [])
+const chapterTitleById = computed(() => new Map(chapters.value.map(c => [c.id, c.title])))
 
 const editModalOpen = ref(false)
 const sectionModalOpen = ref(false)
 const newSectionName = ref('')
 const newSectionDescription = ref('')
+const newSectionChapterDocumentId = ref<number | undefined>(undefined)
 const sectionError = ref('')
 const savingSection = ref(false)
 
@@ -63,10 +71,15 @@ async function addSection() {
   try {
     await $fetch(`/api/admin/subjects/${subjectId}/sections`, {
       method: 'POST',
-      body: { name: newSectionName.value, description: newSectionDescription.value || undefined }
+      body: {
+        name: newSectionName.value,
+        description: newSectionDescription.value || undefined,
+        chapterDocumentId: newSectionChapterDocumentId.value ?? null
+      }
     })
     newSectionName.value = ''
     newSectionDescription.value = ''
+    newSectionChapterDocumentId.value = undefined
     sectionModalOpen.value = false
     await refreshSections()
   } catch (err) {
@@ -185,6 +198,7 @@ async function deleteSection(sectionId: number) {
             </p>
             <p class="text-xs font-mono text-muted mt-1">
               {{ questionCountBySection.get(section.id) ?? 0 }} question{{ questionCountBySection.get(section.id) === 1 ? '' : 's' }}
+              <span v-if="section.chapterDocumentId"> · {{ chapterTitleById.get(section.chapterDocumentId) }}</span>
             </p>
           </NuxtLink>
           <UButton
@@ -232,6 +246,18 @@ async function deleteSection(sectionId: number) {
               v-model="newSectionDescription"
               class="w-full"
               :rows="2"
+            />
+          </UFormField>
+          <UFormField
+            label="Chapter"
+            hint="Optional — its text is sent as context to the LLM grader for any discussion activities in this section"
+          >
+            <USelectMenu
+              v-model="newSectionChapterDocumentId"
+              :items="chapters.map(c => ({ label: c.title, value: c.id }))"
+              value-key="value"
+              placeholder="No chapter"
+              class="w-full"
             />
           </UFormField>
           <p

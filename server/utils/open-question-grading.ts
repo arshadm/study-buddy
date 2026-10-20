@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../database/client'
-import { openQuestions, openQuestionSets, documents, subjects } from '../database/schema'
+import { openQuestions, openQuestionSets, sections, documents, subjects } from '../database/schema'
 import { buildGradingPrompt, gradeAnswer, type GradingResult } from './claude-cli'
 
 export interface PriorRound { promptText: string, answerText: string, feedback: string }
@@ -23,11 +23,12 @@ export async function gradeOpenQuestionAnswer(
   }
 
   const [subject] = await db.select().from(subjects).where(eq(subjects.id, set.subjectId)).limit(1)
+  const section = set.sectionId ? (await db.select().from(sections).where(eq(sections.id, set.sectionId)).limit(1))[0] : undefined
 
   const subjectDocs = await db.select().from(documents).where(eq(documents.subjectId, set.subjectId))
   const syllabus = subjectDocs.find(d => d.role === 'syllabus')
   const markScheme = subjectDocs.find(d => d.role === 'mark_scheme')
-  const chapter = set.chapterDocumentId ? subjectDocs.find(d => d.id === set.chapterDocumentId) : undefined
+  const chapter = section?.chapterDocumentId ? subjectDocs.find(d => d.id === section.chapterDocumentId) : undefined
 
   const prompt = buildGradingPrompt({
     customInstructions: subject?.gradingInstructions ?? null,

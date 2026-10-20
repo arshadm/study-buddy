@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '../../../database/client'
-import { openQuestionSets, openQuestions, sections, documents } from '../../../database/schema'
+import { openQuestionSets, openQuestions, sections } from '../../../database/schema'
 import { bodySchema } from '../../../utils/open-question-set-validation'
 
 export default defineEventHandler(async (event) => {
@@ -19,21 +19,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Section not found' })
   }
 
-  if (body.chapterDocumentId) {
-    const [chapter] = await db.select().from(documents)
-      .where(and(eq(documents.id, body.chapterDocumentId), eq(documents.subjectId, section.subjectId), eq(documents.role, 'chapter')))
-      .limit(1)
-    if (!chapter) {
-      throw createError({ statusCode: 400, statusMessage: 'Chapter document not found for this subject' })
-    }
-  }
-
   const now = Date.now()
 
   await db.update(openQuestionSets).set({
     subjectId: section.subjectId,
     sectionId: body.sectionId,
-    chapterDocumentId: body.chapterDocumentId ?? null,
     title: body.title,
     passageText: body.passageText || null,
     updatedAt: now

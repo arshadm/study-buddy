@@ -2,7 +2,6 @@ import { z } from 'zod'
 
 export const bodySchema = z.object({
   sectionId: z.number().int(),
-  chapterDocumentId: z.number().int().nullable().optional(),
   title: z.string().min(1).max(200),
   passageText: z.string().max(20000).nullable().optional(),
   // id present = update that existing question; omitted = insert a new one. Any existing
