@@ -31,7 +31,23 @@ const { data: questions } = await useFetch<Question[]>('/api/admin/questions', {
 const { data: documents } = await useFetch<DocumentRow[]>(`/api/admin/subjects/${subjectId}/documents`)
 
 const chapters = computed(() => documents.value?.filter(d => d.role === 'chapter') ?? [])
-const chapterTitleById = computed(() => new Map(chapters.value.map(c => [c.id, c.title])))
+
+interface SectionGroup { chapterId: number | null, chapterTitle: string | null, sections: Section[] }
+
+const sectionGroups = computed<SectionGroup[]>(() => {
+  const all = sectionList.value ?? []
+  const groups: SectionGroup[] = chapters.value.map(c => ({
+    chapterId: c.id,
+    chapterTitle: c.title,
+    sections: all.filter(s => s.chapterDocumentId === c.id)
+  }))
+  const chapterIds = new Set(chapters.value.map(c => c.id))
+  const unassigned = all.filter(s => s.chapterDocumentId === null || !chapterIds.has(s.chapterDocumentId))
+  if (unassigned.length > 0) {
+    groups.push({ chapterId: null, chapterTitle: 'No chapter', sections: unassigned })
+  }
+  return groups
+})
 
 const editModalOpen = ref(false)
 const sectionModalOpen = ref(false)
@@ -176,39 +192,60 @@ async function deleteSection(sectionId: number) {
 
       <div
         v-else
-        class="space-y-3"
+        class="space-y-6"
       >
         <div
-          v-for="section in sectionList"
-          :key="section.id"
-          class="rounded-lg border border-default p-4 flex items-center justify-between gap-4"
+          v-for="group in sectionGroups"
+          :key="group.chapterId ?? 'none'"
+          class="space-y-2"
         >
-          <NuxtLink
-            :to="`/admin/subjects/${subjectId}/sections/${section.id}`"
-            class="min-w-0 flex-1 hover:opacity-80 transition-opacity"
+          <h3 class="text-sm font-semibold text-muted uppercase tracking-wide">
+            {{ group.chapterTitle }}
+          </h3>
+
+          <p
+            v-if="!group.sections.length"
+            class="text-sm text-muted pl-3"
           >
-            <p class="font-medium">
-              {{ section.name }}
-            </p>
-            <p
-              v-if="section.description"
-              class="text-sm text-muted truncate"
+            No sections in this chapter yet.
+          </p>
+
+          <div
+            v-else
+            class="space-y-3 pl-3 border-l-2 border-default"
+          >
+            <div
+              v-for="section in group.sections"
+              :key="section.id"
+              class="rounded-lg border border-default p-4 flex items-center justify-between gap-4"
             >
-              {{ section.description }}
-            </p>
-            <p class="text-xs font-mono text-muted mt-1">
-              {{ questionCountBySection.get(section.id) ?? 0 }} question{{ questionCountBySection.get(section.id) === 1 ? '' : 's' }}
-              <span v-if="section.chapterDocumentId"> · {{ chapterTitleById.get(section.chapterDocumentId) }}</span>
-            </p>
-          </NuxtLink>
-          <UButton
-            icon="i-lucide-trash-2"
-            variant="ghost"
-            color="error"
-            size="sm"
-            class="shrink-0"
-            @click="deleteSection(section.id)"
-          />
+              <NuxtLink
+                :to="`/admin/subjects/${subjectId}/sections/${section.id}`"
+                class="min-w-0 flex-1 hover:opacity-80 transition-opacity"
+              >
+                <p class="font-medium">
+                  {{ section.name }}
+                </p>
+                <p
+                  v-if="section.description"
+                  class="text-sm text-muted truncate"
+                >
+                  {{ section.description }}
+                </p>
+                <p class="text-xs font-mono text-muted mt-1">
+                  {{ questionCountBySection.get(section.id) ?? 0 }} question{{ questionCountBySection.get(section.id) === 1 ? '' : 's' }}
+                </p>
+              </NuxtLink>
+              <UButton
+                icon="i-lucide-trash-2"
+                variant="ghost"
+                color="error"
+                size="sm"
+                class="shrink-0"
+                @click="deleteSection(section.id)"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
