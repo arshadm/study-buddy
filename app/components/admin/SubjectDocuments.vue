@@ -44,20 +44,19 @@ async function saveGradingInstructions() {
 
 const syllabus = computed(() => documents.value?.find(d => d.role === 'syllabus') ?? null)
 const markScheme = computed(() => documents.value?.find(d => d.role === 'mark_scheme') ?? null)
-const chapters = computed(() => documents.value?.filter(d => d.role === 'chapter') ?? [])
 
-const ROLE_LABELS = { syllabus: 'Syllabus', mark_scheme: 'Mark scheme', chapter: 'Chapter' } as const
+const ROLE_LABELS = { syllabus: 'Syllabus', mark_scheme: 'Mark scheme' } as const
 
 const uploadModalOpen = ref(false)
-const uploadRole = ref<'syllabus' | 'mark_scheme' | 'chapter'>('chapter')
+const uploadRole = ref<'syllabus' | 'mark_scheme'>('syllabus')
 const uploadTitle = ref('')
 const uploadFile = ref<File | null>(null)
 const uploadError = ref('')
 const uploading = ref(false)
 
-function openUpload(role: 'syllabus' | 'mark_scheme' | 'chapter') {
+function openUpload(role: 'syllabus' | 'mark_scheme') {
   uploadRole.value = role
-  uploadTitle.value = role === 'chapter' ? '' : ROLE_LABELS[role]
+  uploadTitle.value = ROLE_LABELS[role]
   uploadFile.value = null
   uploadError.value = ''
   uploadModalOpen.value = true
@@ -94,11 +93,6 @@ async function submitUpload() {
   } finally {
     uploading.value = false
   }
-}
-
-async function deleteDocument(id: number) {
-  await $fetch(`/api/admin/documents/${id}`, { method: 'DELETE' })
-  await refresh()
 }
 </script>
 
@@ -194,71 +188,12 @@ async function deleteDocument(id: number) {
       </div>
     </div>
 
-    <div class="space-y-2">
-      <div class="flex items-center justify-between">
-        <p class="text-xs font-mono text-muted">
-          Chapters ({{ chapters.length }})
-        </p>
-        <UButton
-          label="Add chapter"
-          icon="i-lucide-plus"
-          size="xs"
-          variant="subtle"
-          color="neutral"
-          @click="openUpload('chapter')"
-        />
-      </div>
-
-      <p
-        v-if="!chapters.length"
-        class="text-sm text-muted"
-      >
-        No chapters yet.
-      </p>
-
-      <div
-        v-for="chapter in chapters"
-        :key="chapter.id"
-        class="rounded-lg border border-default p-3 flex items-center justify-between gap-3"
-      >
-        <div class="min-w-0">
-          <p class="text-sm truncate">
-            {{ chapter.title }}
-          </p>
-          <p
-            v-if="chapter.extractionError"
-            class="text-xs text-error"
-          >
-            {{ chapter.extractionError }}
-          </p>
-        </div>
-        <UButton
-          icon="i-lucide-trash-2"
-          variant="ghost"
-          color="error"
-          size="sm"
-          class="shrink-0"
-          @click="deleteDocument(chapter.id)"
-        />
-      </div>
-    </div>
-
     <UModal
       v-model:open="uploadModalOpen"
-      :title="`${uploadRole === 'chapter' ? 'Add' : 'Replace'} ${ROLE_LABELS[uploadRole].toLowerCase()}`"
+      :title="`Replace ${ROLE_LABELS[uploadRole].toLowerCase()}`"
     >
       <template #body>
         <div class="space-y-4">
-          <UFormField
-            v-if="uploadRole === 'chapter'"
-            label="Title"
-          >
-            <UInput
-              v-model="uploadTitle"
-              class="w-full"
-              placeholder="e.g. Chapter 4: Memory"
-            />
-          </UFormField>
           <UFormField label="Document">
             <input
               type="file"

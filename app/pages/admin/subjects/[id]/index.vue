@@ -20,7 +20,7 @@ interface Question {
   sectionId: number | null
 }
 
-interface DocumentRow { id: number, role: 'syllabus' | 'mark_scheme' | 'chapter', title: string }
+interface DocumentRow { id: number, role: 'syllabus' | 'mark_scheme' | 'chapter', title: string, extractionError: string | null }
 
 const route = useRoute()
 const subjectId = route.params.id as string
@@ -28,7 +28,7 @@ const subjectId = route.params.id as string
 const { data: subject, refresh: refreshSubject } = await useFetch<Subject>(`/api/admin/subjects/${subjectId}`)
 const { data: sectionList, refresh: refreshSections } = await useFetch<Section[]>(`/api/admin/subjects/${subjectId}/sections`)
 const { data: questions } = await useFetch<Question[]>('/api/admin/questions', { query: { subjectId } })
-const { data: documents } = await useFetch<DocumentRow[]>(`/api/admin/subjects/${subjectId}/documents`)
+const { data: documents, refresh: refreshDocuments } = await useFetch<DocumentRow[]>(`/api/admin/subjects/${subjectId}/documents`)
 
 const chapters = computed(() => documents.value?.filter(d => d.role === 'chapter') ?? [])
 
@@ -57,6 +57,12 @@ const newSectionChapterDocumentId = ref<number | undefined>(undefined)
 const sectionError = ref('')
 const savingSection = ref(false)
 
+const chapterModalOpen = ref(false)
+const newChapterTitle = ref('')
+const newChapterFile = ref<File | null>(null)
+const chapterError = ref('')
+const savingChapter = ref(false)
+
 const questionCountBySection = computed(() => {
   const counts = new Map<number, number>()
   for (const q of questions.value ?? []) {
@@ -75,6 +81,14 @@ async function toggleActive() {
   if (!subject.value) return
   await $fetch(`/api/admin/subjects/${subjectId}`, { method: 'PATCH', body: { isActive: !subject.value.isActive } })
   await refreshSubject()
+}
+
+function openAddSection(chapterId?: number) {
+  newSectionName.value = ''
+  newSectionDescription.value = ''
+  newSectionChapterDocumentId.value = chapterId
+  sectionError.value = ''
+  sectionModalOpen.value = true
 }
 
 async function addSection() {
@@ -108,6 +122,50 @@ async function addSection() {
 async function deleteSection(sectionId: number) {
   await $fetch(`/api/admin/subjects/${subjectId}/sections/${sectionId}`, { method: 'DELETE' })
   await refreshSections()
+}
+
+function openAddChapter() {
+  newChapterTitle.value = ''
+  newChapterFile.value = null
+  chapterError.value = ''
+  chapterModalOpen.value = true
+}
+
+function onChapterFileChange(e: Event) {
+  newChapterFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function addChapter() {
+  if (!newChapterTitle.value.trim()) {
+    chapterError.value = 'Title is required'
+    return
+  }
+  if (!newChapterFile.value) {
+    chapterError.value = 'Choose a PDF or Word document'
+    return
+  }
+  savingChapter.value = true
+  chapterError.value = ''
+
+  const formData = new FormData()
+  formData.set('role', 'chapter')
+  formData.set('title', newChapterTitle.value.trim())
+  formData.set('file', newChapterFile.value)
+
+  try {
+    await $fetch(`/api/admin/subjects/${subjectId}/documents`, { method: 'POST', body: formData })
+    chapterModalOpen.value = false
+    await refreshDocuments()
+  } catch (err) {
+    chapterError.value = apiErrorMessage(err, 'Could not upload chapter')
+  } finally {
+    savingChapter.value = false
+  }
+}
+
+async function deleteChapter(docId: number) {
+  await $fetch(`/api/admin/documents/${docId}`, { method: 'DELETE' })
+  await Promise.all([refreshDocuments(), refreshSections()])
 }
 </script>
 
@@ -159,8 +217,8 @@ async function deleteSection(sectionId: number) {
         Resources
       </h2>
       <p class="text-sm text-muted">
-        Syllabus, mark scheme and textbook chapters used as context for LLM-graded discussion
-        activities in this subject.
+        Syllabus and mark scheme used as context for LLM-graded discussion activities in this
+        subject.
       </p>
       <AdminSubjectDocuments :subject-id="subjectId" />
     </div>
@@ -168,26 +226,36 @@ async function deleteSection(sectionId: number) {
     <div class="space-y-3">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-bold tracking-tight">
-          Sections
-          <span class="text-muted font-normal text-sm">({{ sectionList?.length ?? 0 }})</span>
+          Chapters
+          <span class="text-muted font-normal text-sm">({{ chapters.length }})</span>
         </h2>
-        <UButton
-          label="Add section"
-          icon="i-lucide-plus"
-          @click="sectionModalOpen = true"
-        />
+        <div class="flex items-center gap-2">
+          <UButton
+            label="Add section"
+            icon="i-lucide-plus"
+            variant="subtle"
+            color="neutral"
+            @click="openAddSection()"
+          />
+          <UButton
+            label="Add chapter"
+            icon="i-lucide-plus"
+            @click="openAddChapter"
+          />
+        </div>
       </div>
 
       <p class="text-sm text-muted">
-        Sections just organize questions for editing — students are still tested across the whole
-        subject, drawing from every section combined.
+        A chapter's text is sent as context to the LLM grader for discussion activities in its
+        sections. Sections organize questions for editing — students are still tested across the
+        whole subject, drawing from every section combined.
       </p>
 
       <p
-        v-if="!sectionList?.length"
+        v-if="!sectionGroups.length"
         class="text-center py-16 text-muted"
       >
-        No sections yet — add one to start adding questions.
+        No chapters yet — add one, then add sections within it.
       </p>
 
       <div
@@ -199,9 +267,30 @@ async function deleteSection(sectionId: number) {
           :key="group.chapterId ?? 'none'"
           class="space-y-2"
         >
-          <h3 class="text-sm font-semibold text-muted uppercase tracking-wide">
-            {{ group.chapterTitle }}
-          </h3>
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-sm font-semibold text-muted uppercase tracking-wide">
+              {{ group.chapterTitle }}
+            </h3>
+            <div
+              v-if="group.chapterId"
+              class="flex items-center gap-1"
+            >
+              <UButton
+                icon="i-lucide-plus"
+                variant="ghost"
+                color="neutral"
+                size="xs"
+                @click="openAddSection(group.chapterId)"
+              />
+              <UButton
+                icon="i-lucide-trash-2"
+                variant="ghost"
+                color="error"
+                size="xs"
+                @click="deleteChapter(group.chapterId)"
+              />
+            </div>
+          </div>
 
           <p
             v-if="!group.sections.length"
@@ -308,6 +397,43 @@ async function deleteSection(sectionId: number) {
             block
             :loading="savingSection"
             @click="addSection"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="chapterModalOpen"
+      title="Add chapter"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField label="Title">
+            <UInput
+              v-model="newChapterTitle"
+              class="w-full"
+              placeholder="e.g. Chapter 4: Memory"
+            />
+          </UFormField>
+          <UFormField label="Document">
+            <input
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              class="text-sm"
+              @change="onChapterFileChange"
+            >
+          </UFormField>
+          <p
+            v-if="chapterError"
+            class="text-sm text-error"
+          >
+            {{ chapterError }}
+          </p>
+          <UButton
+            label="Upload"
+            block
+            :loading="savingChapter"
+            @click="addChapter"
           />
         </div>
       </template>
