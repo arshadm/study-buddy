@@ -229,20 +229,11 @@ async function deleteChapter(docId: number) {
           Chapters
           <span class="text-muted font-normal text-sm">({{ chapters.length }})</span>
         </h2>
-        <div class="flex items-center gap-2">
-          <UButton
-            label="Add section"
-            icon="i-lucide-plus"
-            variant="subtle"
-            color="neutral"
-            @click="openAddSection()"
-          />
-          <UButton
-            label="Add chapter"
-            icon="i-lucide-plus"
-            @click="openAddChapter"
-          />
-        </div>
+        <UButton
+          label="Add chapter"
+          icon="i-lucide-plus"
+          @click="openAddChapter"
+        />
       </div>
 
       <p class="text-sm text-muted">
