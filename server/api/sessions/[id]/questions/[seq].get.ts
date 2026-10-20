@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '../../../../database/client'
 import { quizSessions, quizSessionQuestions, questions, questionOptions } from '../../../../database/schema'
 import { seededShuffle } from '../../../../utils/seeded-shuffle'
+import { isSessionExpired } from '../../../../utils/session-selection'
 
 export default defineEventHandler(async (event) => {
   const { user } = await requireRole(event, 'student')
@@ -20,7 +21,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'Session is not active' })
   }
 
-  if (Date.now() > session.startedAt + session.timeLimitSeconds * 1000) {
+  if (isSessionExpired(session)) {
     throw createError({ statusCode: 409, statusMessage: 'Session time budget has expired' })
   }
 

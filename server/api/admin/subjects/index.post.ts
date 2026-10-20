@@ -4,9 +4,7 @@ import { subjects } from '../../../database/schema'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
-  defaultQuestionCount: z.number().int().min(1).max(200),
-  defaultTimeLimitSeconds: z.number().int().min(30).max(24 * 60 * 60)
+  description: z.string().max(500).optional()
 })
 
 export default defineEventHandler(async (event) => {

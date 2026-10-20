@@ -3,11 +3,19 @@ import { db } from '../database/client'
 import { subjects, questions, quizSessions, quizSessionSubjects, quizSessionQuestions, paperSections, paperAttempts } from '../database/schema'
 import { pickWeightedQuestionsForSubject } from './weighting'
 
-interface SubjectAllocation {
+export interface SubjectAllocation {
   subjectId: number
   subjectName: string
   questionCount: number
-  timeLimitSeconds: number
+  // Null = this subject is untimed. If any allocation in a session is untimed, the whole
+  // session is untimed (see createSessionForAllocations) — mixing a timed and an untimed
+  // subject into one shared countdown would be misleading since all picks are merged together.
+  timeLimitSeconds: number | null
+}
+
+// Never expires when timeLimitSeconds is null.
+export function isSessionExpired(session: { startedAt: number, timeLimitSeconds: number | null }): boolean {
+  return session.timeLimitSeconds !== null && Date.now() > session.startedAt + session.timeLimitSeconds * 1000
 }
 
 interface PaperContext {
@@ -31,7 +39,8 @@ export async function createSessionForAllocations(studentId: number, allocations
 
   const now = Date.now()
   const plannedQuestionCount = allocations.reduce((sum, a) => sum + a.questionCount, 0)
-  const timeLimitSeconds = allocations.reduce((sum, a) => sum + a.timeLimitSeconds, 0)
+  const allTimed = allocations.every(a => a.timeLimitSeconds !== null)
+  const timeLimitSeconds = allTimed ? allocations.reduce((sum, a) => sum + (a.timeLimitSeconds ?? 0), 0) : null
 
   const [session] = await db.insert(quizSessions).values({
     studentId,
@@ -63,9 +72,9 @@ export async function createSessionForAllocations(studentId: number, allocations
     const activeQuestions = await db.select({ id: questions.id }).from(questions)
       .where(and(eq(questions.subjectId, allocation.subjectId), eq(questions.isActive, true)))
 
-    const expectedTimePerQuestionMs = allocation.questionCount > 0
+    const expectedTimePerQuestionMs = allocation.timeLimitSeconds !== null && allocation.questionCount > 0
       ? (allocation.timeLimitSeconds * 1000) / allocation.questionCount
-      : 0
+      : Number.POSITIVE_INFINITY
 
     if (activeQuestions.length < allocation.questionCount) {
       console.warn(`[study-buddy] Subject "${allocation.subjectName}" has only ${activeQuestions.length} active question(s), fewer than the requested ${allocation.questionCount}.`)
@@ -103,11 +112,18 @@ export async function createSessionForAllocations(studentId: number, allocations
   }
 }
 
-export async function startSession(studentId: number, subjectIds: number[]) {
-  if (subjectIds.length === 0) {
+export interface RequestedAllocation {
+  subjectId: number
+  questionCount: number
+  timeLimitSeconds: number | null
+}
+
+export async function startSession(studentId: number, requested: RequestedAllocation[]) {
+  if (requested.length === 0) {
     throw createError({ statusCode: 400, statusMessage: 'Select at least one subject' })
   }
 
+  const subjectIds = requested.map(r => r.subjectId)
   const chosenSubjects = await db.select().from(subjects)
     .where(and(inArray(subjects.id, subjectIds), eq(subjects.isActive, true)))
 
@@ -115,12 +131,21 @@ export async function startSession(studentId: number, subjectIds: number[]) {
     throw createError({ statusCode: 400, statusMessage: 'No valid subjects selected' })
   }
 
-  return createSessionForAllocations(studentId, chosenSubjects.map(s => ({
-    subjectId: s.id,
-    subjectName: s.name,
-    questionCount: s.defaultQuestionCount,
-    timeLimitSeconds: s.defaultTimeLimitSeconds
-  })))
+  const subjectById = new Map(chosenSubjects.map(s => [s.id, s]))
+
+  const allocations: SubjectAllocation[] = []
+  for (const r of requested) {
+    const subject = subjectById.get(r.subjectId)
+    if (!subject) continue
+    allocations.push({
+      subjectId: subject.id,
+      subjectName: subject.name,
+      questionCount: r.questionCount,
+      timeLimitSeconds: r.timeLimitSeconds
+    })
+  }
+
+  return createSessionForAllocations(studentId, allocations)
 }
 
 export async function startPaperSection(paperAttemptId: number, sectionIndex: number, studentId: number) {

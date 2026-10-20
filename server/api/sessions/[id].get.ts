@@ -3,6 +3,7 @@ import { db } from '../../database/client'
 import { quizSessions, quizSessionQuestions, quizSessionSubjects, subjects, paperAttempts, papers, paperSections } from '../../database/schema'
 import { finishSession } from '../../utils/finish-session'
 import { advancePaperAttempt } from '../../utils/paper-advance'
+import { isSessionExpired } from '../../utils/session-selection'
 
 export default defineEventHandler(async (event) => {
   const { user } = await requireRole(event, 'student')
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  if (session.status === 'in_progress' && Date.now() > session.startedAt + session.timeLimitSeconds * 1000) {
+  if (session.status === 'in_progress' && isSessionExpired(session)) {
     if (paper) {
       const result = await advancePaperAttempt(paper.attemptId, user!.id)
       return { session: null, remainingMs: 0, totalQuestions, firstUnansweredIndex: null, paper, expired: true, advance: result }
@@ -49,7 +50,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const remainingMs = session.status === 'in_progress'
-    ? Math.max(0, session.startedAt + session.timeLimitSeconds * 1000 - Date.now())
+    ? (session.timeLimitSeconds !== null ? Math.max(0, session.startedAt + session.timeLimitSeconds * 1000 - Date.now()) : null)
     : 0
 
   const [firstUnanswered] = await db.select({ sequenceIndex: quizSessionQuestions.sequenceIndex })

@@ -5,8 +5,6 @@ interface Subject {
   id: number
   name: string
   description: string | null
-  defaultQuestionCount: number
-  defaultTimeLimitSeconds: number
   isActive: boolean
 }
 
@@ -104,8 +102,11 @@ async function deleteSection(sectionId: number) {
             class="text-sm text-muted font-mono"
           >(draft)</span>
         </h1>
-        <p class="text-sm text-muted">
-          {{ subject.defaultQuestionCount }} questions per session · {{ Math.round(subject.defaultTimeLimitSeconds / 60) }} min budget
+        <p
+          v-if="subject.description"
+          class="text-sm text-muted"
+        >
+          {{ subject.description }}
         </p>
       </div>
       <UButton

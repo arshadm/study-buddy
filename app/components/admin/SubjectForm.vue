@@ -6,8 +6,6 @@ interface Subject {
   id: number
   name: string
   description: string | null
-  defaultQuestionCount: number
-  defaultTimeLimitSeconds: number
 }
 
 const props = defineProps<{ subject?: Subject | null }>()
@@ -15,18 +13,14 @@ const emit = defineEmits<{ saved: [] }>()
 
 const schema = z.object({
   name: z.string().min(1, 'Required').max(100),
-  description: z.string().max(500).optional(),
-  defaultQuestionCount: z.number().int().min(1).max(200),
-  defaultTimeLimitMinutes: z.number().min(1).max(24 * 60)
+  description: z.string().max(500).optional()
 })
 
 type Schema = z.output<typeof schema>
 
 const state = reactive({
   name: props.subject?.name ?? '',
-  description: props.subject?.description ?? '',
-  defaultQuestionCount: props.subject?.defaultQuestionCount ?? 20,
-  defaultTimeLimitMinutes: props.subject ? props.subject.defaultTimeLimitSeconds / 60 : 30
+  description: props.subject?.description ?? ''
 })
 
 const saving = ref(false)
@@ -37,9 +31,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   errorMessage.value = ''
   const body = {
     name: event.data.name,
-    description: event.data.description || undefined,
-    defaultQuestionCount: event.data.defaultQuestionCount,
-    defaultTimeLimitSeconds: Math.round(event.data.defaultTimeLimitMinutes * 60)
+    description: event.data.description || undefined
   }
   try {
     if (props.subject) {
@@ -83,32 +75,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         :rows="2"
       />
     </UFormField>
-
-    <div class="grid grid-cols-2 gap-4">
-      <UFormField
-        label="Questions per session"
-        name="defaultQuestionCount"
-      >
-        <UInputNumber
-          v-model="state.defaultQuestionCount"
-          class="w-full"
-          :min="1"
-          :max="200"
-        />
-      </UFormField>
-
-      <UFormField
-        label="Time budget (minutes)"
-        name="defaultTimeLimitMinutes"
-      >
-        <UInputNumber
-          v-model="state.defaultTimeLimitMinutes"
-          class="w-full"
-          :min="1"
-          :step="1"
-        />
-      </UFormField>
-    </div>
 
     <p
       v-if="errorMessage"

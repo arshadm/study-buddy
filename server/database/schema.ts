@@ -17,8 +17,6 @@ export const subjects = sqliteTable('subjects', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
   description: text('description'),
-  defaultQuestionCount: integer('default_question_count').notNull().default(20),
-  defaultTimeLimitSeconds: integer('default_time_limit_seconds').notNull().default(1800),
   // Optional custom instructions folded into every LLM grading prompt for this subject's
   // discussion activities — e.g. the grader's role and how strict to be (see claude-cli.ts).
   gradingInstructions: text('grading_instructions'),
@@ -133,7 +131,10 @@ export const quizSessions = sqliteTable('quiz_sessions', {
   studentId: integer('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   status: text('status', { enum: ['in_progress', 'completed', 'abandoned'] }).notNull().default('in_progress'),
   plannedQuestionCount: integer('planned_question_count').notNull(),
-  timeLimitSeconds: integer('time_limit_seconds').notNull(),
+  // Null means untimed — only possible for ad-hoc sessions where every selected subject must
+  // have a time for the session as a whole to be timed (see session-selection.ts). Mock-paper
+  // sessions are always timed, since paper_sections.timeLimitSeconds is required.
+  timeLimitSeconds: integer('time_limit_seconds'),
   startedAt: integer('started_at').notNull(),
   finishedAt: integer('finished_at'),
   scoreCorrect: integer('score_correct'),
@@ -150,7 +151,8 @@ export const quizSessionSubjects = sqliteTable('quiz_session_subjects', {
   quizSessionId: integer('quiz_session_id').notNull().references(() => quizSessions.id, { onDelete: 'cascade' }),
   subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'restrict' }),
   questionCount: integer('question_count').notNull(),
-  timeLimitSeconds: integer('time_limit_seconds').notNull()
+  // Null = this subject was taken untimed (ad-hoc sessions only).
+  timeLimitSeconds: integer('time_limit_seconds')
 }, table => [
   primaryKey({ columns: [table.quizSessionId, table.subjectId] })
 ])

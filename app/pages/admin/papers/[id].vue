@@ -72,6 +72,9 @@ async function toggleActive() {
   await $fetch(`/api/admin/papers/${paperId}`, { method: 'PATCH', body: { isActive: !paper.value.isActive } })
   await refresh()
 }
+
+const totalQuestions = computed(() => (paper.value?.sections ?? []).reduce((sum, s) => sum + s.questionCount, 0))
+const totalMinutes = computed(() => Math.round((paper.value?.sections ?? []).reduce((sum, s) => sum + s.timeLimitSeconds, 0) / 60))
 </script>
 
 <template>
@@ -109,7 +112,13 @@ async function toggleActive() {
         Sections (in order)
       </h2>
       <p
-        v-if="!paper.sections.length"
+        v-if="paper.sections.length"
+        class="text-sm font-mono text-muted"
+      >
+        {{ totalQuestions }} questions · {{ totalMinutes }} minutes total
+      </p>
+      <p
+        v-else
         class="text-sm text-muted"
       >
         No sections yet — add one below.

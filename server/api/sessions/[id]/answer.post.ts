@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../../../database/client'
 import { quizSessions, quizSessionQuestions, questionOptions, questions } from '../../../database/schema'
+import { isSessionExpired } from '../../../utils/session-selection'
 
 const bodySchema = z.object({
   sequenceIndex: z.number().int().min(0),
@@ -25,7 +26,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Session not active' })
   }
 
-  if (Date.now() > session.startedAt + session.timeLimitSeconds * 1000) {
+  if (isSessionExpired(session)) {
     throw createError({ statusCode: 409, statusMessage: 'Session time budget has expired' })
   }
 

@@ -27,7 +27,7 @@ interface PaperContext {
 
 interface SessionOverview {
   session: { id: number, status: string } | null
-  remainingMs: number
+  remainingMs: number | null
   totalQuestions: number
   firstUnansweredIndex: number | null
   paper: PaperContext | null
@@ -76,7 +76,7 @@ async function loadOverview() {
   }
 
   overview.value = data
-  sync(data.remainingMs)
+  if (data.remainingMs !== null) sync(data.remainingMs)
 
   if (data.session.status !== 'in_progress') {
     await navigateTo(`/review/${sessionId.value}`)
@@ -89,7 +89,7 @@ async function loadOverview() {
   }
 
   await loadSummaries()
-  start()
+  if (data.remainingMs !== null) start()
   await goTo(data.firstUnansweredIndex ?? 0)
 }
 
@@ -210,7 +210,7 @@ watch(sessionId, loadOverview)
         </p>
         <div class="flex items-center gap-4">
           <p class="text-lg font-mono font-semibold tabular-nums">
-            {{ formatted }}
+            {{ overview.remainingMs !== null ? formatted : 'No time limit' }}
           </p>
           <UButton
             label="Finish"

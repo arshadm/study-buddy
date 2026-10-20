@@ -5,8 +5,6 @@ interface Subject {
   id: number
   name: string
   description: string | null
-  defaultQuestionCount: number
-  defaultTimeLimitSeconds: number
   isActive: boolean
 }
 
@@ -69,8 +67,11 @@ async function deleteSubject(subject: Subject) {
               class="text-xs text-muted font-mono"
             >(draft)</span>
           </p>
-          <p class="text-sm text-muted">
-            {{ subject.defaultQuestionCount }} questions · {{ Math.round(subject.defaultTimeLimitSeconds / 60) }} min
+          <p
+            v-if="subject.description"
+            class="text-sm text-muted truncate"
+          >
+            {{ subject.description }}
           </p>
         </NuxtLink>
         <div class="flex items-center gap-2 shrink-0">

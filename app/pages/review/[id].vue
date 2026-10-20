@@ -21,7 +21,7 @@ interface ReviewItem {
 }
 
 interface ReviewResponse {
-  session: { id: number, scoreCorrect: number | null, scoreTotal: number | null, timeLimitSeconds: number, startedAt: number, finishedAt: number | null }
+  session: { id: number, scoreCorrect: number | null, scoreTotal: number | null, timeLimitSeconds: number | null, startedAt: number, finishedAt: number | null }
   items: ReviewItem[]
 }
 

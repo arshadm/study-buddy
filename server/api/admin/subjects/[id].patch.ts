@@ -6,8 +6,6 @@ import { subjects } from '../../../database/schema'
 const bodySchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).nullable().optional(),
-  defaultQuestionCount: z.number().int().min(1).max(200).optional(),
-  defaultTimeLimitSeconds: z.number().int().min(30).max(24 * 60 * 60).optional(),
   gradingInstructions: z.string().max(5000).nullable().optional(),
   isActive: z.boolean().optional()
 })
