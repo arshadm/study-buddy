@@ -26,6 +26,16 @@ async function toggleActive(subject: Subject) {
   })
   await refresh()
 }
+
+async function deleteSubject(subject: Subject) {
+  if (!confirm(`Delete "${subject.name}" and all its questions? This cannot be undone.`)) return
+  try {
+    await $fetch(`/api/admin/subjects/${subject.id}`, { method: 'DELETE' })
+    await refresh()
+  } catch (err) {
+    alert(apiErrorMessage(err, 'Could not delete this subject'))
+  }
+}
 </script>
 
 <template>
@@ -77,6 +87,13 @@ async function toggleActive(subject: Subject) {
             color="neutral"
             size="sm"
             @click="toggleActive(subject)"
+          />
+          <UButton
+            icon="i-lucide-trash-2"
+            variant="ghost"
+            color="error"
+            size="sm"
+            @click="deleteSubject(subject)"
           />
         </div>
       </div>
