@@ -57,7 +57,7 @@ async function toggleActive(subject: Subject) {
             <span
               v-if="!subject.isActive"
               class="text-xs text-muted font-mono"
-            >(inactive)</span>
+            >(draft)</span>
           </p>
           <p class="text-sm text-muted">
             {{ subject.defaultQuestionCount }} questions · {{ Math.round(subject.defaultTimeLimitSeconds / 60) }} min
@@ -72,7 +72,7 @@ async function toggleActive(subject: Subject) {
             size="sm"
           />
           <UButton
-            :label="subject.isActive ? 'Deactivate' : 'Activate'"
+            :label="subject.isActive ? 'Unpublish' : 'Publish'"
             variant="ghost"
             color="neutral"
             size="sm"

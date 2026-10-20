@@ -102,7 +102,7 @@ async function deleteSection(sectionId: number) {
           <span
             v-if="!subject.isActive"
             class="text-sm text-muted font-mono"
-          >(inactive)</span>
+          >(draft)</span>
         </h1>
         <p class="text-sm text-muted">
           {{ subject.defaultQuestionCount }} questions per session · {{ Math.round(subject.defaultTimeLimitSeconds / 60) }} min budget
@@ -116,7 +116,7 @@ async function deleteSection(sectionId: number) {
         @click="editModalOpen = true"
       />
       <UButton
-        :label="subject.isActive ? 'Deactivate' : 'Activate'"
+        :label="subject.isActive ? 'Unpublish' : 'Publish'"
         variant="ghost"
         color="neutral"
         size="sm"

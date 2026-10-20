@@ -17,6 +17,9 @@ export default defineEventHandler(async (event) => {
 
   const [subject] = await db.insert(subjects).values({
     ...body,
+    // New subjects start hidden from students (a "draft") until the admin explicitly publishes
+    // them — avoids a half-built subject with no questions showing up on the student start page.
+    isActive: false,
     createdAt: now,
     updatedAt: now
   }).returning()

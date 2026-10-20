@@ -86,7 +86,7 @@ function totalMinutes(paper: Paper) {
             <span
               v-if="!paper.isActive"
               class="text-xs text-muted font-mono"
-            >(inactive)</span>
+            >(draft)</span>
           </p>
           <p class="text-sm text-muted">
             {{ paper.sections.length }} section{{ paper.sections.length === 1 ? '' : 's' }}
@@ -94,7 +94,7 @@ function totalMinutes(paper: Paper) {
           </p>
         </NuxtLink>
         <UButton
-          :label="paper.isActive ? 'Deactivate' : 'Activate'"
+          :label="paper.isActive ? 'Unpublish' : 'Publish'"
           variant="ghost"
           color="neutral"
           size="sm"

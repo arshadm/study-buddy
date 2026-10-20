@@ -66,6 +66,12 @@ async function moveSection(sectionId: number, direction: 'up' | 'down') {
   await $fetch(`/api/admin/papers/${paperId}/sections/${sectionId}/move`, { method: 'POST', body: { direction } })
   await refresh()
 }
+
+async function toggleActive() {
+  if (!paper.value) return
+  await $fetch(`/api/admin/papers/${paperId}`, { method: 'PATCH', body: { isActive: !paper.value.isActive } })
+  await refresh()
+}
 </script>
 
 <template>
@@ -80,9 +86,22 @@ async function moveSection(sectionId: number, direction: 'up' | 'down') {
         color="neutral"
         to="/admin/papers"
       />
-      <h1 class="text-2xl font-bold tracking-tight">
-        {{ paper.name }}
-      </h1>
+      <div class="min-w-0 flex-1">
+        <h1 class="text-2xl font-bold tracking-tight">
+          {{ paper.name }}
+          <span
+            v-if="!paper.isActive"
+            class="text-sm text-muted font-mono"
+          >(draft)</span>
+        </h1>
+      </div>
+      <UButton
+        :label="paper.isActive ? 'Unpublish' : 'Publish'"
+        variant="ghost"
+        color="neutral"
+        size="sm"
+        @click="toggleActive"
+      />
     </div>
 
     <div class="space-y-3">
