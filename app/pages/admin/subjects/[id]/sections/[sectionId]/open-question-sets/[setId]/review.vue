@@ -120,14 +120,14 @@ function formatDate(ms: number | null) {
           class="space-y-3"
         >
           <div
-            v-for="question in attempt.questions"
+            v-for="(question, index) in attempt.questions"
             :key="question.openQuestionId"
             class="rounded-md border p-3 space-y-2"
             :class="question.status === 'needs_review' ? 'border-warning/40 bg-warning/5' : 'border-default'"
           >
             <div class="flex items-center justify-between gap-3">
               <p class="font-medium text-sm">
-                <MathText :text="question.promptText" />
+                {{ index + 1 }}. <MathText :text="question.promptText" />
               </p>
               <span
                 class="text-xs font-mono shrink-0"
