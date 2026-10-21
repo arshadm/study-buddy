@@ -27,7 +27,7 @@ const subjectId = route.params.id as string
 
 const { data: subject, refresh: refreshSubject } = await useFetch<Subject>(`/api/admin/subjects/${subjectId}`)
 const { data: sectionList, refresh: refreshSections } = await useFetch<Section[]>(`/api/admin/subjects/${subjectId}/sections`)
-const { data: questions } = await useFetch<Question[]>('/api/admin/questions', { query: { subjectId } })
+const { data: questions, refresh: refreshQuestions } = await useFetch<Question[]>('/api/admin/questions', { query: { subjectId } })
 const { data: documents, refresh: refreshDocuments } = await useFetch<DocumentRow[]>(`/api/admin/subjects/${subjectId}/documents`)
 
 const chapters = computed(() => documents.value?.filter(d => d.role === 'chapter') ?? [])
@@ -62,6 +62,12 @@ const newChapterTitle = ref('')
 const newChapterFile = ref<File | null>(null)
 const chapterError = ref('')
 const savingChapter = ref(false)
+
+const bulkModalOpen = ref(false)
+
+async function onBulkImported() {
+  await refreshQuestions()
+}
 
 const questionCountBySection = computed(() => {
   const counts = new Map<number, number>()
@@ -229,11 +235,20 @@ async function deleteChapter(docId: number) {
           Chapters
           <span class="text-muted font-normal text-sm">({{ chapters.length }})</span>
         </h2>
-        <UButton
-          label="Add chapter"
-          icon="i-lucide-plus"
-          @click="openAddChapter"
-        />
+        <div class="flex gap-2">
+          <UButton
+            label="Bulk import"
+            icon="i-lucide-upload"
+            variant="subtle"
+            color="neutral"
+            @click="bulkModalOpen = true"
+          />
+          <UButton
+            label="Add chapter"
+            icon="i-lucide-plus"
+            @click="openAddChapter"
+          />
+        </div>
       </div>
 
       <p class="text-sm text-muted">
@@ -429,5 +444,11 @@ async function deleteChapter(docId: number) {
         </div>
       </template>
     </UModal>
+
+    <AdminBulkImportModal
+      v-model:open="bulkModalOpen"
+      :sections="sectionList ?? []"
+      @imported="onBulkImported"
+    />
   </div>
 </template>

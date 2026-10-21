@@ -32,6 +32,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Section not found' })
   }
 
+  const importType = fields.type === 'self_marked_image' ? 'self_marked_image' : 'multiple_choice'
+
   if (!files.zip) {
     throw createError({ statusCode: 400, statusMessage: 'A zip file is required' })
   }
@@ -74,66 +76,120 @@ export default defineEventHandler(async (event) => {
   if (records.length === 0) {
     throw createError({ statusCode: 400, statusMessage: 'CSV has no rows' })
   }
-  if (!('image_filename' in records[0]!) || !('correct_answer' in records[0]!)) {
-    throw createError({ statusCode: 400, statusMessage: 'CSV must have image_filename and correct_answer columns' })
-  }
 
   const errors: string[] = []
-  records.forEach((row, index) => {
-    const rowNumber = index + 2 // +1 for 0-index, +1 for the header row
-    const imageFilename = row.image_filename?.trim()
-    const correctAnswer = row.correct_answer?.trim()
-
-    if (!imageFilename) {
-      errors.push(`Row ${rowNumber}: image_filename is required`)
-    } else if (!imagesByName.has(imageFilename)) {
-      errors.push(`Row ${rowNumber}: no image named "${imageFilename}" found in the zip`)
-    }
-    if (!correctAnswer) {
-      errors.push(`Row ${rowNumber}: correct_answer is required`)
-    }
-
-    const explanationFilename = row.explanation_image_filename?.trim()
-    if (explanationFilename && !imagesByName.has(explanationFilename)) {
-      errors.push(`Row ${rowNumber}: no explanation image named "${explanationFilename}" found in the zip`)
-    }
-  })
-
-  if (errors.length > 0) {
-    throw createError({ statusCode: 400, statusMessage: 'CSV validation failed', data: { errors } })
-  }
-
   const now = Date.now()
   const createdIds: number[] = []
 
-  for (const row of records) {
-    const entry = imagesByName.get(row.image_filename!.trim())!
-    const type = EXTENSION_MIME[extensionOf(entry.entryName)]!
-    const imagePath = await saveQuestionImage({ data: entry.getData(), type })
-
-    const explanationFilename = row.explanation_image_filename?.trim()
-    let workedSolutionImagePath: string | null = null
-    if (explanationFilename) {
-      const explanationEntry = imagesByName.get(explanationFilename)!
-      workedSolutionImagePath = await saveQuestionImage({
-        data: explanationEntry.getData(),
-        type: EXTENSION_MIME[extensionOf(explanationEntry.entryName)]!
-      })
+  if (importType === 'multiple_choice') {
+    if (!('image_filename' in records[0]!) || !('correct_answer' in records[0]!)) {
+      throw createError({ statusCode: 400, statusMessage: 'CSV must have image_filename and correct_answer columns' })
     }
 
-    const [question] = await db.insert(questions).values({
-      subjectId: section.subjectId,
-      sectionId,
-      imagePath,
-      workedSolutionImagePath,
-      type: 'multiple_choice',
-      optionFormat: 'image',
-      correctAnswerText: row.correct_answer!.trim(),
-      createdAt: now,
-      updatedAt: now
-    }).returning()
+    records.forEach((row, index) => {
+      const rowNumber = index + 2 // +1 for 0-index, +1 for the header row
+      const imageFilename = row.image_filename?.trim()
+      const correctAnswer = row.correct_answer?.trim()
 
-    createdIds.push(question!.id)
+      if (!imageFilename) {
+        errors.push(`Row ${rowNumber}: image_filename is required`)
+      } else if (!imagesByName.has(imageFilename)) {
+        errors.push(`Row ${rowNumber}: no image named "${imageFilename}" found in the zip`)
+      }
+      if (!correctAnswer) {
+        errors.push(`Row ${rowNumber}: correct_answer is required`)
+      }
+
+      const explanationFilename = row.explanation_image_filename?.trim()
+      if (explanationFilename && !imagesByName.has(explanationFilename)) {
+        errors.push(`Row ${rowNumber}: no explanation image named "${explanationFilename}" found in the zip`)
+      }
+    })
+
+    if (errors.length > 0) {
+      throw createError({ statusCode: 400, statusMessage: 'CSV validation failed', data: { errors } })
+    }
+
+    for (const row of records) {
+      const entry = imagesByName.get(row.image_filename!.trim())!
+      const type = EXTENSION_MIME[extensionOf(entry.entryName)]!
+      const imagePath = await saveQuestionImage({ data: entry.getData(), type })
+
+      const explanationFilename = row.explanation_image_filename?.trim()
+      let workedSolutionImagePath: string | null = null
+      if (explanationFilename) {
+        const explanationEntry = imagesByName.get(explanationFilename)!
+        workedSolutionImagePath = await saveQuestionImage({
+          data: explanationEntry.getData(),
+          type: EXTENSION_MIME[extensionOf(explanationEntry.entryName)]!
+        })
+      }
+
+      const [question] = await db.insert(questions).values({
+        subjectId: section.subjectId,
+        sectionId,
+        imagePath,
+        workedSolutionImagePath,
+        type: 'multiple_choice',
+        optionFormat: 'image',
+        correctAnswerText: row.correct_answer!.trim(),
+        createdAt: now,
+        updatedAt: now
+      }).returning()
+
+      createdIds.push(question!.id)
+    }
+  } else {
+    if (!('question_image_filename' in records[0]!) || !('answer_image_filename' in records[0]!)) {
+      throw createError({ statusCode: 400, statusMessage: 'CSV must have question_image_filename and answer_image_filename columns' })
+    }
+
+    records.forEach((row, index) => {
+      const rowNumber = index + 2 // +1 for 0-index, +1 for the header row
+      const questionImageFilename = row.question_image_filename?.trim()
+      const answerImageFilename = row.answer_image_filename?.trim()
+
+      if (!questionImageFilename) {
+        errors.push(`Row ${rowNumber}: question_image_filename is required`)
+      } else if (!imagesByName.has(questionImageFilename)) {
+        errors.push(`Row ${rowNumber}: no image named "${questionImageFilename}" found in the zip`)
+      }
+      if (!answerImageFilename) {
+        errors.push(`Row ${rowNumber}: answer_image_filename is required`)
+      } else if (!imagesByName.has(answerImageFilename)) {
+        errors.push(`Row ${rowNumber}: no image named "${answerImageFilename}" found in the zip`)
+      }
+    })
+
+    if (errors.length > 0) {
+      throw createError({ statusCode: 400, statusMessage: 'CSV validation failed', data: { errors } })
+    }
+
+    for (const row of records) {
+      const questionEntry = imagesByName.get(row.question_image_filename!.trim())!
+      const imagePath = await saveQuestionImage({
+        data: questionEntry.getData(),
+        type: EXTENSION_MIME[extensionOf(questionEntry.entryName)]!
+      })
+
+      const answerEntry = imagesByName.get(row.answer_image_filename!.trim())!
+      const workedSolutionImagePath = await saveQuestionImage({
+        data: answerEntry.getData(),
+        type: EXTENSION_MIME[extensionOf(answerEntry.entryName)]!
+      })
+
+      const [question] = await db.insert(questions).values({
+        subjectId: section.subjectId,
+        sectionId,
+        imagePath,
+        workedSolutionImagePath,
+        type: 'self_marked_image',
+        createdAt: now,
+        updatedAt: now
+      }).returning()
+
+      createdIds.push(question!.id)
+    }
   }
 
   return { imported: createdIds.length, questionIds: createdIds }

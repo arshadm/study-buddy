@@ -93,57 +93,9 @@ async function deleteOpenQuestionSet(id: number) {
 }
 
 const bulkModalOpen = ref(false)
-const bulkFile = ref<File | null>(null)
-const bulkErrorMessage = ref('')
-const bulkErrors = ref<string[]>([])
-const bulkSuccessMessage = ref('')
-const bulkSaving = ref(false)
 
-watch(bulkModalOpen, (open) => {
-  if (open) return
-  bulkFile.value = null
-  bulkErrorMessage.value = ''
-  bulkErrors.value = []
-  bulkSuccessMessage.value = ''
-})
-
-function onBulkFileChange(e: Event) {
-  bulkFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
-}
-
-async function submitBulkImport() {
-  if (!bulkFile.value) {
-    bulkErrorMessage.value = 'Choose a zip file'
-    return
-  }
-
-  bulkSaving.value = true
-  bulkErrorMessage.value = ''
-  bulkErrors.value = []
-  bulkSuccessMessage.value = ''
-
-  const formData = new FormData()
-  formData.set('sectionId', sectionId)
-  formData.set('zip', bulkFile.value)
-
-  try {
-    const result = await $fetch<{ imported: number, questionIds: number[] }>('/api/admin/questions/bulk-import', {
-      method: 'POST',
-      body: formData
-    })
-    bulkSuccessMessage.value = `Imported ${result.imported} question${result.imported === 1 ? '' : 's'}.`
-    bulkFile.value = null
-    await refreshQuestions()
-  } catch (err) {
-    const errors = (err as { data?: { data?: { errors?: string[] } } })?.data?.data?.errors
-    if (errors?.length) {
-      bulkErrors.value = errors
-    } else {
-      bulkErrorMessage.value = apiErrorMessage(err, 'Could not import questions')
-    }
-  } finally {
-    bulkSaving.value = false
-  }
+async function onBulkImported() {
+  await refreshQuestions()
 }
 
 function correctOption(question: Question) {
@@ -396,55 +348,11 @@ function correctOption(question: Question) {
       </template>
     </UModal>
 
-    <UModal
+    <AdminBulkImportModal
       v-model:open="bulkModalOpen"
-      title="Bulk import questions"
-    >
-      <template #body>
-        <div class="space-y-4">
-          <p class="text-sm text-muted">
-            Upload a .zip containing your question images plus a <code>questions.csv</code> with
-            <code>image_filename</code> and <code>correct_answer</code> columns, plus an optional
-            <code>explanation_image_filename</code> column (leave blank when there's no worked solution).
-            Each row creates an image-answer multiple choice question in this section.
-          </p>
-          <input
-            type="file"
-            accept=".zip,application/zip"
-            class="text-sm"
-            @change="onBulkFileChange"
-          >
-          <p
-            v-if="bulkErrorMessage"
-            class="text-sm text-error"
-          >
-            {{ bulkErrorMessage }}
-          </p>
-          <ul
-            v-if="bulkErrors.length"
-            class="text-sm text-error list-disc pl-5 space-y-0.5"
-          >
-            <li
-              v-for="(error, index) in bulkErrors"
-              :key="index"
-            >
-              {{ error }}
-            </li>
-          </ul>
-          <p
-            v-if="bulkSuccessMessage"
-            class="text-sm text-success"
-          >
-            {{ bulkSuccessMessage }}
-          </p>
-          <UButton
-            label="Import"
-            block
-            :loading="bulkSaving"
-            @click="submitBulkImport"
-          />
-        </div>
-      </template>
-    </UModal>
+      :sections="sections ?? []"
+      :fixed-section-id="section.id"
+      @imported="onBulkImported"
+    />
   </div>
 </template>
