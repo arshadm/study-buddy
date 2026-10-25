@@ -80,6 +80,14 @@ async function toggleActive() {
 function dateLabel(ms: number) {
   return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
+
+const previewImageUrl = ref<string | null>(null)
+const previewOpen = computed({
+  get: () => previewImageUrl.value !== null,
+  set: (open: boolean) => {
+    if (!open) previewImageUrl.value = null
+  }
+})
 </script>
 
 <template>
@@ -154,10 +162,11 @@ function dateLabel(ms: number) {
       >
         No completed sessions yet.
       </p>
-      <div
+      <NuxtLink
         v-for="item in history"
         :key="item.id"
-        class="rounded-lg border border-default p-4 flex items-center justify-between"
+        :to="`/admin/students/${id}/sessions/${item.id}`"
+        class="rounded-lg border border-default p-4 flex items-center justify-between hover:border-muted transition-colors"
       >
         <div>
           <p class="font-medium">
@@ -170,7 +179,7 @@ function dateLabel(ms: number) {
         <p class="font-mono font-semibold">
           {{ formatScore(item.scoreCorrect) }} / {{ item.scoreTotal }}
         </p>
-      </div>
+      </NuxtLink>
     </div>
 
     <div
@@ -185,11 +194,17 @@ function dateLabel(ms: number) {
         :key="q.questionId"
         class="rounded-lg border border-default p-3 flex items-center gap-4"
       >
-        <img
-          :src="q.imageUrl"
-          alt="Question"
-          class="size-14 rounded-md object-contain bg-white border border-default shrink-0"
+        <button
+          type="button"
+          class="shrink-0 cursor-zoom-in"
+          @click="previewImageUrl = q.imageUrl"
         >
+          <img
+            :src="q.imageUrl"
+            alt="Question"
+            class="size-14 rounded-md object-contain bg-white border border-default"
+          >
+        </button>
         <div class="min-w-0 flex-1">
           <p class="text-xs font-mono text-muted">
             {{ q.subjectName }}
@@ -203,5 +218,19 @@ function dateLabel(ms: number) {
         </p>
       </div>
     </div>
+
+    <UModal
+      v-model:open="previewOpen"
+      title="Question"
+    >
+      <template #body>
+        <img
+          v-if="previewImageUrl"
+          :src="previewImageUrl"
+          alt="Question"
+          class="w-full h-auto max-h-[75vh] object-contain bg-white rounded-md"
+        >
+      </template>
+    </UModal>
   </div>
 </template>
