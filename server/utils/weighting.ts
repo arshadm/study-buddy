@@ -61,8 +61,14 @@ export function getQuestionStats(studentId: number, subjectId: number): Question
       MAX(ssq.answered_at) AS last_seen_at,
       AVG(CASE WHEN ${sql.raw(EFFECTIVE_PERCENT)} = 100 THEN ssq.time_spent_ms END) AS avg_correct_time_ms
     FROM ${questions} q
-    LEFT JOIN ${quizSessionQuestions} ssq ON ssq.question_id = q.id
-    LEFT JOIN ${quizSessions} s ON s.id = ssq.quiz_session_id AND s.student_id = ${studentId} AND s.status = 'completed'
+    -- Pre-filtered to this student's completed sessions before joining, not after: a plain
+    -- "LEFT JOIN ssq ... LEFT JOIN sessions ... AND student_id = ?" matches every student's
+    -- attempts at the first join and only nulls out the session columns for a mismatch, so
+    -- another student's wrong answers on the same question would otherwise count here too.
+    LEFT JOIN (
+      SELECT ssq.* FROM ${quizSessionQuestions} ssq
+      INNER JOIN ${quizSessions} s ON s.id = ssq.quiz_session_id AND s.student_id = ${studentId} AND s.status = 'completed'
+    ) ssq ON ssq.question_id = q.id
     WHERE q.subject_id = ${subjectId} AND q.is_active = 1
     GROUP BY q.id
   `)
