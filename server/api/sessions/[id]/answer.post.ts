@@ -90,9 +90,6 @@ export default defineEventHandler(async (event) => {
     if (body.selfMarkScorePercent === undefined) {
       throw createError({ statusCode: 400, statusMessage: 'selfMarkScorePercent is required for this question' })
     }
-    if (!current.submittedAnswerImagePath) {
-      throw createError({ statusCode: 400, statusMessage: 'Upload your answer image before marking it' })
-    }
 
     await db.update(quizSessionQuestions).set({
       selfMarkScorePercent: body.selfMarkScorePercent,

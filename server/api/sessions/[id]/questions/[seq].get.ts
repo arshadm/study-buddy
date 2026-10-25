@@ -73,10 +73,9 @@ export default defineEventHandler(async (event) => {
     selectedOptionId: current.selectedOptionId,
     submittedAnswerText: current.submittedAnswerText,
     submittedAnswerImageUrl: current.submittedAnswerImagePath ? `/uploads/${current.submittedAnswerImagePath}` : null,
-    // Only reveal the worked solution once the student has submitted their own attempt.
-    workedSolutionImageUrl: current.submittedAnswerImagePath && questionRow.workedSolutionImagePath
-      ? `/uploads/${questionRow.workedSolutionImagePath}`
-      : null,
+    // The client gates showing this behind its own "Check answer" button — uploading a photo
+    // of their working is optional, so reveal no longer depends on having submitted one.
+    workedSolutionImageUrl: questionRow.workedSolutionImagePath ? `/uploads/${questionRow.workedSolutionImagePath}` : null,
     selfMarkScorePercent: questionRow.type === 'self_marked_image' ? current.selfMarkScorePercent : null,
     hintUsed: current.hintUsed,
     flagged: current.flagged,

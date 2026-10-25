@@ -47,6 +47,14 @@ const hintRevealed = ref(props.hintUsed)
 // just types the answer (e.g. a letter) instead of clicking anything.
 const textAnswerInput = ref(props.submittedAnswerText ?? '')
 
+// Already marked in a previous visit to this question (e.g. navigated away and back) —
+// show the solution and the student's prior mark straight away rather than re-hiding it.
+const solutionRevealed = ref(props.selfMarkScorePercent !== null)
+
+function revealSolution() {
+  solutionRevealed.value = true
+}
+
 watch(textAnswerInput, (raw) => {
   const trimmed = raw.trim()
   if (!trimmed) return
@@ -127,56 +135,28 @@ function revealHint() {
       v-else
       class="space-y-4"
     >
-      <div
-        v-if="!submittedAnswerImageUrl"
-        class="space-y-2"
-      >
-        <p class="text-sm text-muted">
-          Upload a photo of your working
-        </p>
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          class="text-sm"
-          @change="onAnswerImageChange"
-        >
-      </div>
-
-      <template v-else>
-        <div class="grid gap-3 sm:grid-cols-2">
-          <div>
-            <p class="text-xs font-mono text-muted mb-1">
-              Your answer
-            </p>
-            <img
-              :src="submittedAnswerImageUrl"
-              alt="Your submitted answer"
-              class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
-            >
-          </div>
-          <div v-if="workedSolutionImageUrl">
-            <p class="text-xs font-mono text-muted mb-1">
-              Worked solution
-            </p>
-            <img
-              :src="workedSolutionImageUrl"
-              alt="Worked solution"
-              class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
-            >
-          </div>
-        </div>
-
-        <UFormField label="How did you do?">
-          <URadioGroup
-            :model-value="selfMarkRadioValue"
-            :items="SELF_MARK_OPTIONS"
-            @update:model-value="markSelf"
-          />
-        </UFormField>
-
-        <div>
-          <p class="text-xs text-muted mb-1">
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div class="space-y-2">
+          <p class="text-xs font-mono text-muted mb-1">
+            Your working
+          </p>
+          <img
+            v-if="submittedAnswerImageUrl"
+            :src="submittedAnswerImageUrl"
+            alt="Your submitted answer"
+            class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
+          >
+          <p
+            v-if="submittedAnswerImageUrl"
+            class="text-xs text-muted"
+          >
             Uploaded the wrong photo?
+          </p>
+          <p
+            v-else
+            class="text-xs text-muted"
+          >
+            Optional — upload a photo of your working if you'd like
           </p>
           <input
             type="file"
@@ -185,7 +165,35 @@ function revealHint() {
             @change="onAnswerImageChange"
           >
         </div>
-      </template>
+        <div v-if="solutionRevealed && workedSolutionImageUrl">
+          <p class="text-xs font-mono text-muted mb-1">
+            Worked solution
+          </p>
+          <img
+            :src="workedSolutionImageUrl"
+            alt="Worked solution"
+            class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
+          >
+        </div>
+      </div>
+
+      <UButton
+        v-if="!solutionRevealed"
+        label="Check answer"
+        icon="i-lucide-eye"
+        @click="revealSolution"
+      />
+
+      <UFormField
+        v-else
+        label="How did you do?"
+      >
+        <URadioGroup
+          :model-value="selfMarkRadioValue"
+          :items="SELF_MARK_OPTIONS"
+          @update:model-value="markSelf"
+        />
+      </UFormField>
     </div>
 
     <div class="flex items-center gap-4">
