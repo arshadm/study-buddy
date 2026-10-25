@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, uniqueIndex, index, primaryKey } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, integer, text, real, uniqueIndex, index, primaryKey } from 'drizzle-orm/sqlite-core'
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -48,7 +48,8 @@ export const documents = sqliteTable('documents', {
   subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
   role: text('role', { enum: ['syllabus', 'mark_scheme', 'chapter'] }).notNull(),
   title: text('title').notNull(),
-  filePath: text('file_path').notNull(),
+  // Null for a chapter added without notes yet — syllabus/mark_scheme always have a file.
+  filePath: text('file_path'),
   extractedText: text('extracted_text'),
   extractionError: text('extraction_error'),
   createdAt: integer('created_at').notNull(),
@@ -141,7 +142,8 @@ export const quizSessions = sqliteTable('quiz_sessions', {
   timeLimitSeconds: integer('time_limit_seconds'),
   startedAt: integer('started_at').notNull(),
   finishedAt: integer('finished_at'),
-  scoreCorrect: integer('score_correct'),
+  // Real, not integer — self-marked questions can contribute partial credit (e.g. 7.75/10).
+  scoreCorrect: real('score_correct'),
   scoreTotal: integer('score_total'),
   paperAttemptId: integer('paper_attempt_id').references(() => paperAttempts.id, { onDelete: 'cascade' }),
   paperSectionIndex: integer('paper_section_index'),
@@ -172,6 +174,10 @@ export const quizSessionQuestions = sqliteTable('quiz_session_questions', {
   // The student's typed answer for a multiple_choice + optionFormat 'image' question.
   submittedAnswerText: text('submitted_answer_text'),
   isCorrect: integer('is_correct', { mode: 'boolean' }),
+  // Self-marked questions only — partial credit the student picked (0, 25, 50, 75 or 100),
+  // validated in the API. isCorrect stays in sync (true iff this is 100) for anything that
+  // only needs a boolean. Null for every other question type and for unanswered questions.
+  selfMarkScorePercent: integer('self_mark_score_percent'),
   hintUsed: integer('hint_used', { mode: 'boolean' }).notNull().default(false),
   flagged: integer('flagged', { mode: 'boolean' }).notNull().default(false),
   timeSpentMs: integer('time_spent_ms'),

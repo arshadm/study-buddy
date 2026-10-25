@@ -20,7 +20,7 @@ interface Question {
   sectionId: number | null
 }
 
-interface DocumentRow { id: number, role: 'syllabus' | 'mark_scheme' | 'chapter', title: string, extractionError: string | null }
+interface DocumentRow { id: number, role: 'syllabus' | 'mark_scheme' | 'chapter', title: string, filePath: string | null, extractionError: string | null }
 
 const route = useRoute()
 const subjectId = route.params.id as string
@@ -32,19 +32,20 @@ const { data: documents, refresh: refreshDocuments } = await useFetch<DocumentRo
 
 const chapters = computed(() => documents.value?.filter(d => d.role === 'chapter') ?? [])
 
-interface SectionGroup { chapterId: number | null, chapterTitle: string | null, sections: Section[] }
+interface SectionGroup { chapterId: number | null, chapterTitle: string | null, hasNotes: boolean, sections: Section[] }
 
 const sectionGroups = computed<SectionGroup[]>(() => {
   const all = sectionList.value ?? []
   const groups: SectionGroup[] = chapters.value.map(c => ({
     chapterId: c.id,
     chapterTitle: c.title,
+    hasNotes: c.filePath !== null,
     sections: all.filter(s => s.chapterDocumentId === c.id)
   }))
   const chapterIds = new Set(chapters.value.map(c => c.id))
   const unassigned = all.filter(s => s.chapterDocumentId === null || !chapterIds.has(s.chapterDocumentId))
   if (unassigned.length > 0) {
-    groups.push({ chapterId: null, chapterTitle: 'No chapter', sections: unassigned })
+    groups.push({ chapterId: null, chapterTitle: 'No chapter', hasNotes: true, sections: unassigned })
   }
   return groups
 })
@@ -62,6 +63,12 @@ const newChapterTitle = ref('')
 const newChapterFile = ref<File | null>(null)
 const chapterError = ref('')
 const savingChapter = ref(false)
+
+const chapterNotesModalOpen = ref(false)
+const chapterNotesTargetId = ref<number | null>(null)
+const chapterNotesFile = ref<File | null>(null)
+const chapterNotesError = ref('')
+const savingChapterNotes = ref(false)
 
 const bulkModalOpen = ref(false)
 
@@ -146,17 +153,13 @@ async function addChapter() {
     chapterError.value = 'Title is required'
     return
   }
-  if (!newChapterFile.value) {
-    chapterError.value = 'Choose a PDF or Word document'
-    return
-  }
   savingChapter.value = true
   chapterError.value = ''
 
   const formData = new FormData()
   formData.set('role', 'chapter')
   formData.set('title', newChapterTitle.value.trim())
-  formData.set('file', newChapterFile.value)
+  if (newChapterFile.value) formData.set('file', newChapterFile.value)
 
   try {
     await $fetch(`/api/admin/subjects/${subjectId}/documents`, { method: 'POST', body: formData })
@@ -172,6 +175,39 @@ async function addChapter() {
 async function deleteChapter(docId: number) {
   await $fetch(`/api/admin/documents/${docId}`, { method: 'DELETE' })
   await Promise.all([refreshDocuments(), refreshSections()])
+}
+
+function openChapterNotes(docId: number) {
+  chapterNotesTargetId.value = docId
+  chapterNotesFile.value = null
+  chapterNotesError.value = ''
+  chapterNotesModalOpen.value = true
+}
+
+function onChapterNotesFileChange(e: Event) {
+  chapterNotesFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function submitChapterNotes() {
+  if (!chapterNotesFile.value) {
+    chapterNotesError.value = 'Choose a PDF or Word document'
+    return
+  }
+  savingChapterNotes.value = true
+  chapterNotesError.value = ''
+
+  const formData = new FormData()
+  formData.set('file', chapterNotesFile.value)
+
+  try {
+    await $fetch(`/api/admin/documents/${chapterNotesTargetId.value}`, { method: 'PATCH', body: formData })
+    chapterNotesModalOpen.value = false
+    await refreshDocuments()
+  } catch (err) {
+    chapterNotesError.value = apiErrorMessage(err, 'Could not upload notes')
+  } finally {
+    savingChapterNotes.value = false
+  }
 }
 </script>
 
@@ -274,13 +310,24 @@ async function deleteChapter(docId: number) {
           class="space-y-2"
         >
           <div class="flex items-center justify-between gap-2">
-            <h3 class="text-sm font-semibold text-muted uppercase tracking-wide">
+            <h3 class="text-sm font-semibold text-muted uppercase tracking-wide flex items-center gap-2">
               {{ group.chapterTitle }}
+              <span
+                v-if="group.chapterId && !group.hasNotes"
+                class="text-xs font-normal normal-case text-warning"
+              >No notes yet</span>
             </h3>
             <div
               v-if="group.chapterId"
               class="flex items-center gap-1"
             >
+              <UButton
+                icon="i-lucide-upload"
+                variant="ghost"
+                color="neutral"
+                size="xs"
+                @click="openChapterNotes(group.chapterId)"
+              />
               <UButton
                 icon="i-lucide-plus"
                 variant="ghost"
@@ -421,7 +468,10 @@ async function deleteChapter(docId: number) {
               placeholder="e.g. Chapter 4: Memory"
             />
           </UFormField>
-          <UFormField label="Document">
+          <UFormField
+            label="Chapter notes"
+            hint="Optional — a PDF or Word document; its text is sent as context to the LLM grader for discussion activities in this chapter's sections. You can add it later if you don't have it yet."
+          >
             <input
               type="file"
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -440,6 +490,39 @@ async function deleteChapter(docId: number) {
             block
             :loading="savingChapter"
             @click="addChapter"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="chapterNotesModalOpen"
+      title="Add / replace chapter notes"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField
+            label="Chapter notes"
+            hint="A PDF or Word document — its text is sent as context to the LLM grader for discussion activities in this chapter's sections."
+          >
+            <input
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              class="text-sm"
+              @change="onChapterNotesFileChange"
+            >
+          </UFormField>
+          <p
+            v-if="chapterNotesError"
+            class="text-sm text-error"
+          >
+            {{ chapterNotesError }}
+          </p>
+          <UButton
+            label="Upload"
+            block
+            :loading="savingChapterNotes"
+            @click="submitChapterNotes"
           />
         </div>
       </template>

@@ -26,13 +26,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'title is required' })
   }
 
-  if (!files.file) {
+  // Chapter notes are optional — a chapter can be created first and have its notes added
+  // later; syllabus/mark_scheme always require a file.
+  if (role !== 'chapter' && !files.file) {
     throw createError({ statusCode: 400, statusMessage: 'A document file is required' })
   }
-  const mimeType = documentMimeType(files.file)
 
   // syllabus/mark_scheme are single-current-version per subject — replace any existing one.
-  let replaced: { id: number, filePath: string } | null = null
+  let replaced: { id: number, filePath: string | null } | null = null
   if (role !== 'chapter') {
     const [existing] = await db.select({ id: documents.id, filePath: documents.filePath })
       .from(documents)
@@ -41,8 +42,16 @@ export default defineEventHandler(async (event) => {
     replaced = existing ?? null
   }
 
-  const filePath = await saveDocumentFile(files.file)
-  const { text, error } = await extractDocumentText(files.file.data, mimeType)
+  let filePath: string | null = null
+  let text: string | null = null
+  let error: string | null = null
+  if (files.file) {
+    const mimeType = documentMimeType(files.file)
+    filePath = await saveDocumentFile(files.file)
+    const extracted = await extractDocumentText(files.file.data, mimeType)
+    text = extracted.text
+    error = extracted.error
+  }
   const now = Date.now()
 
   const [document] = await db.insert(documents).values({

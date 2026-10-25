@@ -28,7 +28,8 @@ export async function saveDocumentFile(file: { data: Buffer, type?: string }) {
   return relativePath
 }
 
-export async function deleteDocumentFile(relativePath: string) {
+export async function deleteDocumentFile(relativePath: string | null) {
+  if (!relativePath) return
   const safePath = resolveSafeUploadPath(relativePath)
   if (!safePath) return
   await unlink(safePath).catch(() => {})

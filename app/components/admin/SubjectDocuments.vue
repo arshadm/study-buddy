@@ -4,7 +4,7 @@ interface Document {
   subjectId: number
   role: 'syllabus' | 'mark_scheme' | 'chapter'
   title: string
-  filePath: string
+  filePath: string | null
   extractionError: string | null
   createdAt: number
   updatedAt: number
