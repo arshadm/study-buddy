@@ -40,7 +40,7 @@ function sectionPercent(section: Section) {
         {{ data.paperName }} complete
       </p>
       <p class="text-4xl font-bold tracking-tight font-mono">
-        {{ data.overall.correct }} / {{ data.overall.total }}
+        {{ formatScore(data.overall.correct) }} / {{ data.overall.total }}
       </p>
       <p class="text-muted mt-1">
         {{ percent }}% correct overall
@@ -79,7 +79,7 @@ function sectionPercent(section: Section) {
         </div>
         <div class="text-right">
           <p class="font-mono font-semibold">
-            {{ section.scoreCorrect }} / {{ section.scoreTotal }}
+            {{ formatScore(section.scoreCorrect) }} / {{ section.scoreTotal }}
           </p>
           <p class="text-xs text-muted">
             {{ sectionPercent(section) }}%

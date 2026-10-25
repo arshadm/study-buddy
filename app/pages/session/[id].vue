@@ -11,7 +11,7 @@ interface Question {
   submittedAnswerText: string | null
   submittedAnswerImageUrl: string | null
   workedSolutionImageUrl: string | null
-  selfMarkedCorrect: boolean | null
+  selfMarkScorePercent: number | null
   hintUsed: boolean
   flagged: boolean
   options: { id: number, optionText: string | null, optionImageUrl: string | null, sortOrder: number }[]
@@ -112,7 +112,7 @@ async function goTo(index: number) {
   }
 }
 
-async function handleAnswer(payload: { selectedOptionId?: number, submittedAnswerText?: string, selfMarkCorrect?: boolean, hintUsed: boolean }) {
+async function handleAnswer(payload: { selectedOptionId?: number, submittedAnswerText?: string, selfMarkScorePercent?: number, hintUsed: boolean }) {
   saving.value = true
   try {
     await $fetch(`/api/sessions/${sessionId.value}/answer`, {
@@ -124,7 +124,7 @@ async function handleAnswer(payload: { selectedOptionId?: number, submittedAnswe
       }
     })
     if (currentQuestion.value) {
-      currentQuestion.value.selfMarkedCorrect = payload.selfMarkCorrect ?? currentQuestion.value.selfMarkedCorrect
+      currentQuestion.value.selfMarkScorePercent = payload.selfMarkScorePercent ?? currentQuestion.value.selfMarkScorePercent
       currentQuestion.value.submittedAnswerText = payload.submittedAnswerText ?? currentQuestion.value.submittedAnswerText
     }
     const summary = questionSummaries.value.find(s => s.sequenceIndex === currentIndex.value)
@@ -263,7 +263,7 @@ watch(sessionId, loadOverview)
         :submitted-answer-text="currentQuestion.submittedAnswerText"
         :submitted-answer-image-url="currentQuestion.submittedAnswerImageUrl"
         :worked-solution-image-url="currentQuestion.workedSolutionImageUrl"
-        :self-marked-correct="currentQuestion.selfMarkedCorrect"
+        :self-mark-score-percent="currentQuestion.selfMarkScorePercent"
         :hint-used="currentQuestion.hintUsed"
         :flagged="currentQuestion.flagged"
         :saving="saving"

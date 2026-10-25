@@ -1,6 +1,7 @@
 import { eq, and, isNull, sql } from 'drizzle-orm'
 import { db } from '../database/client'
 import { quizSessions, quizSessionQuestions } from '../database/schema'
+import { effectivePercentSql } from './scoring'
 
 export async function finishSession(sessionId: number) {
   // isCorrect is the canonical "answered" signal for every question type — set on MCQ
@@ -13,7 +14,8 @@ export async function finishSession(sessionId: number) {
     ))
 
   const [totals] = await db.select({
-    correct: sql<number>`SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END)`,
+    // Fractional — a self-marked question's partial-credit score contributes e.g. 0.75.
+    correct: sql<number>`SUM(${sql.raw(effectivePercentSql())}) / 100.0`,
     total: sql<number>`COUNT(*)`
   })
     .from(quizSessionQuestions)

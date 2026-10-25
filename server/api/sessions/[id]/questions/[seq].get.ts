@@ -77,7 +77,7 @@ export default defineEventHandler(async (event) => {
     workedSolutionImageUrl: current.submittedAnswerImagePath && questionRow.workedSolutionImagePath
       ? `/uploads/${questionRow.workedSolutionImagePath}`
       : null,
-    selfMarkedCorrect: questionRow.type === 'self_marked_image' ? current.isCorrect : null,
+    selfMarkScorePercent: questionRow.type === 'self_marked_image' ? current.selfMarkScorePercent : null,
     hintUsed: current.hintUsed,
     flagged: current.flagged,
     options

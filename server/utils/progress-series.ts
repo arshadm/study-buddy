@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { db } from '../database/client'
+import { effectivePercentSql } from './scoring'
 
 export interface ProgressPoint {
   x: number // startedAt timestamp, ms
@@ -81,7 +82,7 @@ export function getSubjectSessionsProgress(): SubjectProgress[] {
       qs.student_id AS student_id,
       u.display_name AS student_name,
       qs.started_at AS started_at,
-      SUM(CASE WHEN ssq.is_correct = 1 THEN 1 ELSE 0 END) AS correct,
+      SUM(${sql.raw(effectivePercentSql('ssq.'))}) / 100.0 AS correct,
       COUNT(*) AS total
     FROM quiz_session_questions ssq
     INNER JOIN quiz_sessions qs ON qs.id = ssq.quiz_session_id AND qs.status = 'completed'

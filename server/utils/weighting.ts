@@ -1,6 +1,9 @@
 import { sql } from 'drizzle-orm'
 import { db } from '../database/client'
 import { questions, quizSessionQuestions, quizSessions } from '../database/schema'
+import { effectivePercentSql } from './scoring'
+
+const EFFECTIVE_PERCENT = effectivePercentSql('ssq.')
 
 // Tunable constants for the adaptive weighting formula.
 const WRONG_ATTEMPT_WEIGHT = 1.5
@@ -50,9 +53,10 @@ export function getQuestionStats(studentId: number, subjectId: number): Question
       q.section_id AS section_id,
       q.difficulty AS difficulty,
       COUNT(ssq.id) AS times_seen,
-      SUM(CASE WHEN ssq.is_correct = 0 THEN 1 ELSE 0 END) AS times_wrong,
+      -- Fractional: a self-marked partial-credit score contributes less "wrong" than a flat miss.
+      SUM((100 - ${sql.raw(EFFECTIVE_PERCENT)}) / 100.0) AS times_wrong,
       MAX(ssq.answered_at) AS last_seen_at,
-      AVG(CASE WHEN ssq.is_correct = 1 THEN ssq.time_spent_ms END) AS avg_correct_time_ms
+      AVG(CASE WHEN ${sql.raw(EFFECTIVE_PERCENT)} = 100 THEN ssq.time_spent_ms END) AS avg_correct_time_ms
     FROM ${questions} q
     LEFT JOIN ${quizSessionQuestions} ssq ON ssq.question_id = q.id
     LEFT JOIN ${quizSessions} s ON s.id = ssq.quiz_session_id AND s.student_id = ${studentId} AND s.status = 'completed'
@@ -79,7 +83,7 @@ export function getCategoryStats(studentId: number, subjectId: number): Category
     SELECT
       q.section_id AS section_id,
       COUNT(ssq.id) AS times_seen,
-      SUM(CASE WHEN ssq.is_correct = 0 THEN 1 ELSE 0 END) AS times_wrong
+      SUM((100 - ${sql.raw(EFFECTIVE_PERCENT)}) / 100.0) AS times_wrong
     FROM ${questions} q
     LEFT JOIN ${quizSessionQuestions} ssq ON ssq.question_id = q.id
     LEFT JOIN ${quizSessions} s ON s.id = ssq.quiz_session_id AND s.student_id = ${studentId} AND s.status = 'completed'

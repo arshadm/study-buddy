@@ -6,6 +6,16 @@ interface Option {
   sortOrder: number
 }
 
+interface SelfMarkOption { value: 0 | 25 | 50 | 75 | 100, label: string, description: string }
+
+const SELF_MARK_OPTIONS: SelfMarkOption[] = [
+  { value: 100, label: '100%', description: 'Completely right' },
+  { value: 75, label: '75%', description: 'Mostly right' },
+  { value: 50, label: '50%', description: 'Half right' },
+  { value: 25, label: '25%', description: 'Mostly wrong' },
+  { value: 0, label: '0%', description: 'Completely wrong' }
+]
+
 const props = defineProps<{
   type: 'multiple_choice' | 'self_marked_image'
   optionFormat: 'text' | 'image'
@@ -16,14 +26,14 @@ const props = defineProps<{
   submittedAnswerText: string | null
   submittedAnswerImageUrl: string | null
   workedSolutionImageUrl: string | null
-  selfMarkedCorrect: boolean | null
+  selfMarkScorePercent: number | null
   hintUsed: boolean
   flagged: boolean
   saving: boolean
 }>()
 
 const emit = defineEmits<{
-  'answer': [payload: { selectedOptionId?: number, submittedAnswerText?: string, selfMarkCorrect?: boolean, hintUsed: boolean }]
+  'answer': [payload: { selectedOptionId?: number, submittedAnswerText?: string, selfMarkScorePercent?: number, hintUsed: boolean }]
   'toggle-flag': []
   'upload-answer-image': [file: File]
 }>()
@@ -48,9 +58,11 @@ function selectOption(optionId: number) {
   emit('answer', { selectedOptionId: optionId, hintUsed: hintRevealed.value })
 }
 
-function markSelf(correct: boolean) {
-  emit('answer', { selfMarkCorrect: correct, hintUsed: hintRevealed.value })
+function markSelf(scorePercent: number) {
+  emit('answer', { selfMarkScorePercent: scorePercent, hintUsed: hintRevealed.value })
 }
+
+const selfMarkRadioValue = computed(() => (props.selfMarkScorePercent ?? undefined) as SelfMarkOption['value'] | undefined)
 
 function onAnswerImageChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -64,8 +76,8 @@ function revealHint() {
     emit('answer', { submittedAnswerText: textAnswerInput.value.trim(), hintUsed: true })
   } else if (props.type === 'multiple_choice' && selectedOptionId.value !== null) {
     emit('answer', { selectedOptionId: selectedOptionId.value, hintUsed: true })
-  } else if (props.type === 'self_marked_image' && props.selfMarkedCorrect !== null) {
-    emit('answer', { selfMarkCorrect: props.selfMarkedCorrect, hintUsed: true })
+  } else if (props.type === 'self_marked_image' && props.selfMarkScorePercent !== null) {
+    emit('answer', { selfMarkScorePercent: props.selfMarkScorePercent, hintUsed: true })
   }
 }
 </script>
@@ -154,22 +166,13 @@ function revealHint() {
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <UButton
-            label="Got it right"
-            icon="i-lucide-check"
-            :variant="selfMarkedCorrect === true ? 'solid' : 'subtle'"
-            :color="selfMarkedCorrect === true ? 'success' : 'neutral'"
-            @click="markSelf(true)"
+        <UFormField label="How did you do?">
+          <URadioGroup
+            :model-value="selfMarkRadioValue"
+            :items="SELF_MARK_OPTIONS"
+            @update:model-value="markSelf"
           />
-          <UButton
-            label="Got it wrong"
-            icon="i-lucide-x"
-            :variant="selfMarkedCorrect === false ? 'solid' : 'subtle'"
-            :color="selfMarkedCorrect === false ? 'error' : 'neutral'"
-            @click="markSelf(false)"
-          />
-        </div>
+        </UFormField>
 
         <div>
           <p class="text-xs text-muted mb-1">

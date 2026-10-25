@@ -52,6 +52,7 @@ export default defineEventHandler(async (event) => {
       flagged: sq.flagged,
       timeSpentMs: sq.timeSpentMs,
       isCorrect: sq.isCorrect,
+      selfMarkScorePercent: sq.selfMarkScorePercent,
       type: question.type,
       optionFormat: question.optionFormat,
       selectedOptionId: sq.selectedOptionId,

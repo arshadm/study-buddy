@@ -8,7 +8,8 @@ const bodySchema = z.object({
   sequenceIndex: z.number().int().min(0),
   selectedOptionId: z.number().int().optional(),
   submittedAnswerText: z.string().optional(),
-  selfMarkCorrect: z.boolean().optional(),
+  // Partial credit the student picked for a self-marked question.
+  selfMarkScorePercent: z.union([z.literal(0), z.literal(25), z.literal(50), z.literal(75), z.literal(100)]).optional(),
   hintUsed: z.boolean().default(false),
   clientElapsedMs: z.number().int().min(0)
 })
@@ -86,15 +87,16 @@ export default defineEventHandler(async (event) => {
       answeredAt: now
     }).where(eq(quizSessionQuestions.id, current.id))
   } else {
-    if (body.selfMarkCorrect === undefined) {
-      throw createError({ statusCode: 400, statusMessage: 'selfMarkCorrect is required for this question' })
+    if (body.selfMarkScorePercent === undefined) {
+      throw createError({ statusCode: 400, statusMessage: 'selfMarkScorePercent is required for this question' })
     }
     if (!current.submittedAnswerImagePath) {
       throw createError({ statusCode: 400, statusMessage: 'Upload your answer image before marking it' })
     }
 
     await db.update(quizSessionQuestions).set({
-      isCorrect: body.selfMarkCorrect,
+      selfMarkScorePercent: body.selfMarkScorePercent,
+      isCorrect: body.selfMarkScorePercent === 100,
       hintUsed: body.hintUsed,
       timeSpentMs,
       answeredAt: now

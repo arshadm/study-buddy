@@ -16,6 +16,7 @@ const props = defineProps<{
     flagged: boolean
     timeSpentMs: number | null
     isCorrect: boolean | null
+    selfMarkScorePercent: number | null
     type: 'multiple_choice' | 'self_marked_image'
     optionFormat: 'text' | 'image'
     selectedOptionId: number | null
@@ -28,6 +29,22 @@ const props = defineProps<{
 
 const solutionRevealed = ref(false)
 
+const SELF_MARK_LABELS: Record<number, string> = {
+  0: 'Completely wrong',
+  25: 'Mostly wrong',
+  50: 'Half right',
+  75: 'Mostly right',
+  100: 'Completely right'
+}
+
+// 'success' at 100%, 'error' at 0%, 'warning' in between — only meaningful for self-marked rows.
+const selfMarkColor = computed<'success' | 'warning' | 'error'>(() => {
+  const pct = props.item.selfMarkScorePercent ?? 0
+  if (pct >= 100) return 'success'
+  if (pct <= 0) return 'error'
+  return 'warning'
+})
+
 const timeSpentLabel = computed(() => {
   if (!props.item.timeSpentMs) return null
   const seconds = Math.round(props.item.timeSpentMs / 1000)
@@ -39,7 +56,9 @@ const timeSpentLabel = computed(() => {
 <template>
   <div
     class="rounded-lg border p-4 space-y-3"
-    :class="item.isCorrect ? 'border-success/40' : 'border-error/40'"
+    :class="item.type === 'self_marked_image'
+      ? (selfMarkColor === 'success' ? 'border-success/40' : selfMarkColor === 'warning' ? 'border-warning/40' : 'border-error/40')
+      : (item.isCorrect ? 'border-success/40' : 'border-error/40')"
   >
     <div class="flex items-center justify-between text-sm">
       <span class="font-mono text-muted">
@@ -64,6 +83,18 @@ const timeSpentLabel = computed(() => {
           /> hint used
         </span>
         <span
+          v-if="item.type === 'self_marked_image'"
+          class="flex items-center gap-1 font-medium"
+          :class="selfMarkColor === 'success' ? 'text-success' : selfMarkColor === 'warning' ? 'text-warning' : 'text-error'"
+        >
+          <UIcon
+            :name="selfMarkColor === 'success' ? 'i-lucide-check-circle-2' : selfMarkColor === 'warning' ? 'i-lucide-circle-dot' : 'i-lucide-x-circle'"
+            class="size-4"
+          />
+          {{ item.selfMarkScorePercent ?? 0 }}% · {{ SELF_MARK_LABELS[item.selfMarkScorePercent ?? 0] }}
+        </span>
+        <span
+          v-else
           class="flex items-center gap-1 font-medium"
           :class="item.isCorrect ? 'text-success' : 'text-error'"
         >

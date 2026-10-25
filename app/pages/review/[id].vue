@@ -11,6 +11,7 @@ interface ReviewItem {
   flagged: boolean
   timeSpentMs: number | null
   isCorrect: boolean | null
+  selfMarkScorePercent: number | null
   type: 'multiple_choice' | 'self_marked_image'
   optionFormat: 'text' | 'image'
   selectedOptionId: number | null
@@ -52,7 +53,7 @@ const timeTakenLabel = computed(() => {
         Session complete
       </p>
       <p class="text-4xl font-bold tracking-tight font-mono">
-        {{ data.session.scoreCorrect }} / {{ data.session.scoreTotal }}
+        {{ formatScore(data.session.scoreCorrect) }} / {{ data.session.scoreTotal }}
       </p>
       <p class="text-muted mt-1">
         {{ percent }}% correct<span v-if="timeTakenLabel"> · took {{ timeTakenLabel }}</span>

@@ -100,7 +100,7 @@ function dateLabel(ms: number) {
           </div>
           <div class="text-right">
             <p class="font-mono font-semibold">
-              {{ item.scoreCorrect }} / {{ item.scoreTotal }}
+              {{ formatScore(item.scoreCorrect) }} / {{ item.scoreTotal }}
             </p>
             <p class="text-xs text-muted">
               {{ percentFor(item) }}%
