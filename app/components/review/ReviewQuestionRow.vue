@@ -10,6 +10,7 @@ const props = defineProps<{
   index: number
   item: {
     subjectName?: string
+    sectionName?: string | null
     imageUrl: string
     workedSolutionImageUrl: string | null
     hintUsed: boolean
@@ -62,7 +63,7 @@ const timeSpentLabel = computed(() => {
   >
     <div class="flex items-center justify-between text-sm">
       <span class="font-mono text-muted">
-        Q{{ index + 1 }}<span v-if="item.subjectName"> · {{ item.subjectName }}</span>
+        Q{{ index + 1 }}<span v-if="item.subjectName"> · {{ item.subjectName }}<span v-if="item.sectionName"> › {{ item.sectionName }}</span></span>
         <span v-if="item.flagged"> · <UIcon
           name="i-lucide-flag"
           class="size-3 text-warning inline align-text-top"

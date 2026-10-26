@@ -19,6 +19,7 @@ interface SlowQuestion {
   questionId: number
   imageUrl: string
   subjectName: string
+  sectionName: string | null
   avgTimeMs: number
   timesSeen: number
   timesCorrect: number
@@ -229,7 +230,7 @@ const previewOpen = computed({
         </button>
         <div class="min-w-0 flex-1">
           <p class="text-xs font-mono text-muted">
-            {{ q.subjectName }}
+            {{ q.subjectName }}<span v-if="q.sectionName"> › {{ q.sectionName }}</span>
           </p>
           <p class="text-sm">
             Seen {{ q.timesSeen }}×, correct {{ q.timesCorrect }}×

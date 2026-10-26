@@ -4,6 +4,7 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 interface ReviewItem {
   sequenceIndex: number
   subjectName?: string
+  sectionName?: string | null
   imageUrl: string
   workedSolutionImageUrl: string | null
   hintText: string | null

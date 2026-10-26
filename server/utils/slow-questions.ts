@@ -5,6 +5,7 @@ interface SlowQuestionRow {
   question_id: number
   image_path: string
   subject_name: string
+  section_name: string | null
   avg_time_ms: number
   times_seen: number
   times_correct: number
@@ -14,6 +15,7 @@ export interface SlowQuestion {
   questionId: number
   imageUrl: string
   subjectName: string
+  sectionName: string | null
   avgTimeMs: number
   timesSeen: number
   timesCorrect: number
@@ -25,6 +27,7 @@ export function getSlowQuestions(studentId: number, subjectId?: number, limit = 
       q.id AS question_id,
       q.image_path AS image_path,
       sub.name AS subject_name,
+      sec.name AS section_name,
       AVG(ssq.time_spent_ms) AS avg_time_ms,
       COUNT(*) AS times_seen,
       SUM(CASE WHEN ssq.is_correct = 1 THEN 1 ELSE 0 END) AS times_correct
@@ -33,6 +36,7 @@ export function getSlowQuestions(studentId: number, subjectId?: number, limit = 
     LEFT JOIN paper_attempts pa ON pa.id = s.paper_attempt_id
     INNER JOIN questions q ON q.id = ssq.question_id
     INNER JOIN subjects sub ON sub.id = q.subject_id
+    LEFT JOIN sections sec ON sec.id = q.section_id
     WHERE ssq.time_spent_ms IS NOT NULL
     -- A mock-paper section only counts once the whole paper is done, not as
     -- each section individually finishes.
@@ -47,6 +51,7 @@ export function getSlowQuestions(studentId: number, subjectId?: number, limit = 
     questionId: r.question_id,
     imageUrl: `/uploads/${r.image_path}`,
     subjectName: r.subject_name,
+    sectionName: r.section_name,
     avgTimeMs: Math.round(r.avg_time_ms),
     timesSeen: r.times_seen,
     timesCorrect: r.times_correct
