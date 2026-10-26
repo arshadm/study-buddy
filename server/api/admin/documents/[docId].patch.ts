@@ -14,21 +14,40 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Document not found' })
   }
 
-  const { files } = await parseMultipartForm(event)
-  if (!files.file) {
-    throw createError({ statusCode: 400, statusMessage: 'A document file is required' })
+  const { fields, files } = await parseMultipartForm(event)
+
+  const updates: Partial<typeof documents.$inferInsert> = { updatedAt: Date.now() }
+
+  if ('title' in fields) {
+    const title = fields.title?.trim()
+    if (!title) {
+      throw createError({ statusCode: 400, statusMessage: 'title is required' })
+    }
+    updates.title = title
   }
 
-  const mimeType = documentMimeType(files.file)
-  const filePath = await saveDocumentFile(files.file)
-  const { text, error } = await extractDocumentText(files.file.data, mimeType)
+  // Only 'chapter' docs can go without a file — syllabus/mark_scheme always require one
+  // (enforced on create too), so removing theirs here would leave them in an invalid state.
+  if (fields.removeFile === 'true' && existing.role !== 'chapter') {
+    throw createError({ statusCode: 400, statusMessage: 'A document file is required for this role' })
+  }
 
-  const [document] = await db.update(documents).set({
-    filePath,
-    extractedText: text,
-    extractionError: error,
-    updatedAt: Date.now()
-  }).where(eq(documents.id, docId)).returning({
+  let oldFilePath: string | null = null
+  if (files.file) {
+    const mimeType = documentMimeType(files.file)
+    updates.filePath = await saveDocumentFile(files.file)
+    const { text, error } = await extractDocumentText(files.file.data, mimeType)
+    updates.extractedText = text
+    updates.extractionError = error
+    oldFilePath = existing.filePath
+  } else if (fields.removeFile === 'true') {
+    updates.filePath = null
+    updates.extractedText = null
+    updates.extractionError = null
+    oldFilePath = existing.filePath
+  }
+
+  const [document] = await db.update(documents).set(updates).where(eq(documents.id, docId)).returning({
     id: documents.id,
     subjectId: documents.subjectId,
     role: documents.role,
@@ -39,7 +58,9 @@ export default defineEventHandler(async (event) => {
     updatedAt: documents.updatedAt
   })
 
-  await deleteDocumentFile(existing.filePath)
+  if (oldFilePath) {
+    await deleteDocumentFile(oldFilePath)
+  }
 
   return document
 })

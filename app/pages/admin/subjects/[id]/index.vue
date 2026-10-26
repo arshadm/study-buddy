@@ -64,11 +64,14 @@ const newChapterFile = ref<File | null>(null)
 const chapterError = ref('')
 const savingChapter = ref(false)
 
-const chapterNotesModalOpen = ref(false)
-const chapterNotesTargetId = ref<number | null>(null)
-const chapterNotesFile = ref<File | null>(null)
-const chapterNotesError = ref('')
-const savingChapterNotes = ref(false)
+const editChapterModalOpen = ref(false)
+const editChapterTargetId = ref<number | null>(null)
+const editChapterTitle = ref('')
+const editChapterHasNotes = ref(false)
+const editChapterFile = ref<File | null>(null)
+const editChapterRemoveNotes = ref(false)
+const editChapterError = ref('')
+const savingEditChapter = ref(false)
 
 const bulkModalOpen = ref(false)
 
@@ -177,36 +180,50 @@ async function deleteChapter(docId: number) {
   await Promise.all([refreshDocuments(), refreshSections()])
 }
 
-function openChapterNotes(docId: number) {
-  chapterNotesTargetId.value = docId
-  chapterNotesFile.value = null
-  chapterNotesError.value = ''
-  chapterNotesModalOpen.value = true
+function openEditChapter(docId: number) {
+  const chapter = chapters.value.find(c => c.id === docId)
+  if (!chapter) return
+  editChapterTargetId.value = docId
+  editChapterTitle.value = chapter.title
+  editChapterHasNotes.value = chapter.filePath !== null
+  editChapterFile.value = null
+  editChapterRemoveNotes.value = false
+  editChapterError.value = ''
+  editChapterModalOpen.value = true
 }
 
-function onChapterNotesFileChange(e: Event) {
-  chapterNotesFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+function onEditChapterFileChange(e: Event) {
+  editChapterFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+  editChapterRemoveNotes.value = false
 }
 
-async function submitChapterNotes() {
-  if (!chapterNotesFile.value) {
-    chapterNotesError.value = 'Choose a PDF or Word document'
+function removeEditChapterNotes() {
+  editChapterFile.value = null
+  editChapterHasNotes.value = false
+  editChapterRemoveNotes.value = true
+}
+
+async function saveEditChapter() {
+  if (!editChapterTitle.value.trim()) {
+    editChapterError.value = 'Title is required'
     return
   }
-  savingChapterNotes.value = true
-  chapterNotesError.value = ''
+  savingEditChapter.value = true
+  editChapterError.value = ''
 
   const formData = new FormData()
-  formData.set('file', chapterNotesFile.value)
+  formData.set('title', editChapterTitle.value.trim())
+  if (editChapterFile.value) formData.set('file', editChapterFile.value)
+  else if (editChapterRemoveNotes.value) formData.set('removeFile', 'true')
 
   try {
-    await $fetch(`/api/admin/documents/${chapterNotesTargetId.value}`, { method: 'PATCH', body: formData })
-    chapterNotesModalOpen.value = false
+    await $fetch(`/api/admin/documents/${editChapterTargetId.value}`, { method: 'PATCH', body: formData })
+    editChapterModalOpen.value = false
     await refreshDocuments()
   } catch (err) {
-    chapterNotesError.value = apiErrorMessage(err, 'Could not upload notes')
+    editChapterError.value = apiErrorMessage(err, 'Could not save chapter')
   } finally {
-    savingChapterNotes.value = false
+    savingEditChapter.value = false
   }
 }
 </script>
@@ -322,11 +339,11 @@ async function submitChapterNotes() {
               class="flex items-center gap-1"
             >
               <UButton
-                icon="i-lucide-upload"
+                icon="i-lucide-pencil"
                 variant="ghost"
                 color="neutral"
                 size="xs"
-                @click="openChapterNotes(group.chapterId)"
+                @click="openEditChapter(group.chapterId)"
               />
               <UButton
                 icon="i-lucide-plus"
@@ -496,33 +513,57 @@ async function submitChapterNotes() {
     </UModal>
 
     <UModal
-      v-model:open="chapterNotesModalOpen"
-      title="Add / replace chapter notes"
+      v-model:open="editChapterModalOpen"
+      title="Edit chapter"
     >
       <template #body>
         <div class="space-y-4">
+          <UFormField label="Title">
+            <UInput
+              v-model="editChapterTitle"
+              class="w-full"
+            />
+          </UFormField>
           <UFormField
             label="Chapter notes"
-            hint="A PDF or Word document — its text is sent as context to the LLM grader for discussion activities in this chapter's sections."
+            hint="Optional — a PDF or Word document; its text is sent as context to the LLM grader for discussion activities in this chapter's sections."
           >
-            <input
-              type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              class="text-sm"
-              @change="onChapterNotesFileChange"
-            >
+            <div class="space-y-2">
+              <p
+                v-if="editChapterHasNotes"
+                class="text-sm text-muted"
+              >
+                Notes already uploaded — choose a file to replace them.
+              </p>
+              <div class="flex items-center gap-3">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  class="text-sm"
+                  @change="onEditChapterFileChange"
+                >
+                <UButton
+                  v-if="editChapterHasNotes"
+                  label="Remove"
+                  variant="ghost"
+                  color="neutral"
+                  size="sm"
+                  @click="removeEditChapterNotes"
+                />
+              </div>
+            </div>
           </UFormField>
           <p
-            v-if="chapterNotesError"
+            v-if="editChapterError"
             class="text-sm text-error"
           >
-            {{ chapterNotesError }}
+            {{ editChapterError }}
           </p>
           <UButton
-            label="Upload"
+            label="Save"
             block
-            :loading="savingChapterNotes"
-            @click="submitChapterNotes"
+            :loading="savingEditChapter"
+            @click="saveEditChapter"
           />
         </div>
       </template>
