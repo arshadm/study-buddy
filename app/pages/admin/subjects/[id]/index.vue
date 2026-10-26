@@ -79,6 +79,20 @@ async function onBulkImported() {
   await refreshQuestions()
 }
 
+// Keyed the same way as the template's :key — group.chapterId, or 'none' for the unassigned group.
+const expandedChapters = ref<Set<number | 'none'>>(new Set())
+
+function toggleChapter(key: number | 'none') {
+  const next = new Set(expandedChapters.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expandedChapters.value = next
+}
+
+function expandAllChapters() {
+  expandedChapters.value = new Set(sectionGroups.value.map(g => g.chapterId ?? 'none'))
+}
+
 const questionCountBySection = computed(() => {
   const counts = new Map<number, number>()
   for (const q of questions.value ?? []) {
@@ -290,6 +304,13 @@ async function saveEditChapter() {
         </h2>
         <div class="flex gap-2">
           <UButton
+            label="Expand all"
+            icon="i-lucide-unfold-vertical"
+            variant="ghost"
+            color="neutral"
+            @click="expandAllChapters"
+          />
+          <UButton
             label="Bulk import"
             icon="i-lucide-upload"
             variant="subtle"
@@ -326,17 +347,28 @@ async function saveEditChapter() {
           :key="group.chapterId ?? 'none'"
           class="space-y-2"
         >
-          <div class="flex items-center justify-between gap-2">
-            <h3 class="text-sm font-semibold text-muted uppercase tracking-wide flex items-center gap-2">
-              {{ group.chapterTitle }}
+          <div
+            class="flex items-center justify-between gap-2 cursor-pointer"
+            @click="toggleChapter(group.chapterId ?? 'none')"
+          >
+            <h3 class="text-sm font-semibold text-muted uppercase tracking-wide flex items-center gap-2 min-w-0">
+              <UIcon
+                :name="expandedChapters.has(group.chapterId ?? 'none') ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                class="size-4 shrink-0"
+              />
+              <span class="truncate">{{ group.chapterTitle }}</span>
+              <span class="text-xs font-normal normal-case text-muted shrink-0">
+                ({{ group.sections.length }})
+              </span>
               <span
                 v-if="group.chapterId && !group.hasNotes"
-                class="text-xs font-normal normal-case text-warning"
+                class="text-xs font-normal normal-case text-warning shrink-0"
               >No notes yet</span>
             </h3>
             <div
               v-if="group.chapterId"
-              class="flex items-center gap-1"
+              class="flex items-center gap-1 shrink-0"
+              @click.stop
             >
               <UButton
                 icon="i-lucide-pencil"
@@ -362,49 +394,51 @@ async function saveEditChapter() {
             </div>
           </div>
 
-          <p
-            v-if="!group.sections.length"
-            class="text-sm text-muted pl-3"
-          >
-            No sections in this chapter yet.
-          </p>
-
-          <div
-            v-else
-            class="space-y-3 pl-3 border-l-2 border-default"
-          >
-            <div
-              v-for="section in group.sections"
-              :key="section.id"
-              class="rounded-lg border border-default p-4 flex items-center justify-between gap-4"
+          <template v-if="expandedChapters.has(group.chapterId ?? 'none')">
+            <p
+              v-if="!group.sections.length"
+              class="text-sm text-muted pl-3"
             >
-              <NuxtLink
-                :to="`/admin/subjects/${subjectId}/sections/${section.id}`"
-                class="min-w-0 flex-1 hover:opacity-80 transition-opacity"
+              No sections in this chapter yet.
+            </p>
+
+            <div
+              v-else
+              class="space-y-3 pl-3 border-l-2 border-default"
+            >
+              <div
+                v-for="section in group.sections"
+                :key="section.id"
+                class="rounded-lg border border-default p-4 flex items-center justify-between gap-4"
               >
-                <p class="font-medium">
-                  {{ section.name }}
-                </p>
-                <p
-                  v-if="section.description"
-                  class="text-sm text-muted truncate"
+                <NuxtLink
+                  :to="`/admin/subjects/${subjectId}/sections/${section.id}`"
+                  class="min-w-0 flex-1 hover:opacity-80 transition-opacity"
                 >
-                  {{ section.description }}
-                </p>
-                <p class="text-xs font-mono text-muted mt-1">
-                  {{ questionCountBySection.get(section.id) ?? 0 }} question{{ questionCountBySection.get(section.id) === 1 ? '' : 's' }}
-                </p>
-              </NuxtLink>
-              <UButton
-                icon="i-lucide-trash-2"
-                variant="ghost"
-                color="error"
-                size="sm"
-                class="shrink-0"
-                @click="deleteSection(section.id)"
-              />
+                  <p class="font-medium">
+                    {{ section.name }}
+                  </p>
+                  <p
+                    v-if="section.description"
+                    class="text-sm text-muted truncate"
+                  >
+                    {{ section.description }}
+                  </p>
+                  <p class="text-xs font-mono text-muted mt-1">
+                    {{ questionCountBySection.get(section.id) ?? 0 }} question{{ questionCountBySection.get(section.id) === 1 ? '' : 's' }}
+                  </p>
+                </NuxtLink>
+                <UButton
+                  icon="i-lucide-trash-2"
+                  variant="ghost"
+                  color="error"
+                  size="sm"
+                  class="shrink-0"
+                  @click="deleteSection(section.id)"
+                />
+              </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
     </div>
