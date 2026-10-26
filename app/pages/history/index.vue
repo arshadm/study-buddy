@@ -23,6 +23,21 @@ interface PaperAttemptResult {
   paperName: string
   overall: { correct: number, total: number }
 }
+interface ChapterReportRow {
+  sectionId: number | null
+  sectionName: string
+  attempted: boolean
+  accuracyPercent: number | null
+  totalAnswered: number
+}
+interface SubjectReportRow {
+  subjectId: number
+  subjectName: string
+  attempted: boolean
+  accuracyPercent: number | null
+  totalAnswered: number
+  chapters: ChapterReportRow[]
+}
 
 const { data: subjects } = await useFetch<Subject[]>('/api/subjects')
 const subjectFilter = ref<number | undefined>(undefined)
@@ -33,6 +48,7 @@ const { data: sessions, refresh } = await useFetch<HistoryItem[]>('/api/sessions
 
 const { data: slowQuestions } = await useFetch<SlowQuestion[]>('/api/sessions/slow-questions')
 const { data: paperAttempts } = await useFetch<PaperAttemptResult[]>('/api/paper-attempts')
+const { data: report } = await useFetch<SubjectReportRow[]>('/api/sessions/report')
 
 watch(subjectFilter, () => refresh())
 
@@ -115,6 +131,13 @@ function dateLabel(ms: number) {
         </div>
       </NuxtLink>
     </div>
+
+    <ReportBreakdown
+      :report="report"
+      title="Where to focus next"
+      empty-message="No subjects with questions yet."
+      not-attempted-heading="Not tried yet"
+    />
 
     <div
       v-if="paperAttempts?.length"
