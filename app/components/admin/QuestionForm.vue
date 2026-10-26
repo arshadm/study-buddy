@@ -2,7 +2,8 @@
 import type { OptionDraft } from './QuestionOptionEditor.vue'
 
 interface Subject { id: number, name: string }
-interface Section { id: number, name: string }
+interface Chapter { id: number, title: string }
+interface Section { id: number, name: string, chapterDocumentId: number | null }
 interface ExistingQuestion {
   id: number
   subjectId: number
@@ -27,24 +28,48 @@ const emit = defineEmits<{ saved: [] }>()
 const { data: subjects } = await useFetch<Subject[]>('/api/admin/subjects', { immediate: !props.fixedSectionId })
 
 const subjectId = ref<number | undefined>(props.fixedSectionId ? undefined : props.question?.subjectId)
+// null = explicitly "No chapter"; undefined = nothing chosen yet.
+const chapterId = ref<number | null | undefined>(undefined)
 const sectionId = ref<number | undefined>(props.fixedSectionId ?? props.question?.sectionId ?? undefined)
+const chaptersForSubject = ref<Chapter[]>([])
 const sectionsForSubject = ref<Section[]>([])
 
 // Plain $fetch doesn't forward the incoming request's cookies during SSR;
 // useRequestFetch does, which this needs since it can run at setup time.
 const requestFetch = useRequestFetch()
 
+async function loadChapters(id: number | undefined) {
+  if (!id) {
+    chaptersForSubject.value = []
+    return
+  }
+  const docs = await requestFetch<{ id: number, role: string, title: string }[]>(`/api/admin/subjects/${id}/documents`)
+  chaptersForSubject.value = docs.filter(d => d.role === 'chapter').map(d => ({ id: d.id, title: d.title }))
+}
+
 async function loadSections(id: number | undefined) {
   sectionsForSubject.value = id ? await requestFetch<Section[]>(`/api/admin/subjects/${id}/sections`) : []
 }
 
+const sectionsForChapter = computed(() => sectionsForSubject.value.filter(s => s.chapterDocumentId === (chapterId.value ?? null)))
+
 if (!props.fixedSectionId) {
-  await loadSections(subjectId.value)
+  await Promise.all([loadSections(subjectId.value), loadChapters(subjectId.value)])
+  if (props.question) {
+    const currentSection = sectionsForSubject.value.find(s => s.id === props.question!.sectionId)
+    chapterId.value = currentSection ? currentSection.chapterDocumentId : null
+  }
 }
 
 watch(subjectId, async (newId, oldId) => {
   if (props.fixedSectionId || newId === oldId) return
-  await loadSections(newId)
+  await Promise.all([loadSections(newId), loadChapters(newId)])
+  chapterId.value = undefined
+  sectionId.value = undefined
+})
+
+watch(chapterId, (newId, oldId) => {
+  if (props.fixedSectionId || newId === oldId) return
   sectionId.value = undefined
 })
 
@@ -178,13 +203,23 @@ async function onSubmit() {
           class="w-full"
         />
       </UFormField>
+      <UFormField label="Chapter">
+        <USelectMenu
+          v-model="chapterId"
+          :items="[{ label: 'No chapter', value: null }, ...chaptersForSubject.map(c => ({ label: c.title, value: c.id }))]"
+          value-key="value"
+          :placeholder="subjectId ? 'Choose a chapter' : 'Choose a subject first'"
+          :disabled="!subjectId"
+          class="w-full"
+        />
+      </UFormField>
       <UFormField label="Section">
         <USelectMenu
           v-model="sectionId"
-          :items="sectionsForSubject.map(s => ({ label: s.name, value: s.id }))"
+          :items="sectionsForChapter.map(s => ({ label: s.name, value: s.id }))"
           value-key="value"
-          :placeholder="subjectId ? 'Choose a section' : 'Choose a subject first'"
-          :disabled="!subjectId"
+          :placeholder="chapterId !== undefined ? 'Choose a section' : 'Choose a chapter first'"
+          :disabled="chapterId === undefined"
           class="w-full"
         />
       </UFormField>
