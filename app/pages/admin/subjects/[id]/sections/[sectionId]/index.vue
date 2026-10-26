@@ -29,6 +29,9 @@ interface OpenQuestionSet {
   needsReviewCount: number
 }
 
+interface Subject { id: number, name: string }
+interface SectionOption { id: number, name: string }
+
 const route = useRoute()
 const subjectId = route.params.id as string
 const sectionId = route.params.sectionId as string
@@ -90,6 +93,60 @@ async function deleteQuestion(id: number) {
 async function deleteOpenQuestionSet(id: number) {
   await $fetch(`/api/admin/open-question-sets/${id}`, { method: 'DELETE' })
   await refreshOpenQuestionSets()
+}
+
+const { data: allSubjects } = await useFetch<Subject[]>('/api/admin/subjects')
+
+// Plain $fetch doesn't forward the incoming request's cookies during SSR;
+// useRequestFetch does, which this needs since it can run at setup time.
+const requestFetch = useRequestFetch()
+
+const moveModalOpen = ref(false)
+const moveQuestion = ref<Question | null>(null)
+const moveSubjectId = ref<number | undefined>(undefined)
+const moveSectionId = ref<number | undefined>(undefined)
+const moveSectionsForSubject = ref<SectionOption[]>([])
+const moveSaving = ref(false)
+const moveError = ref('')
+
+async function loadMoveSections(id: number | undefined) {
+  moveSectionsForSubject.value = id ? await requestFetch<SectionOption[]>(`/api/admin/subjects/${id}/sections`) : []
+}
+
+async function openMoveModal(question: Question) {
+  moveQuestion.value = question
+  moveError.value = ''
+  moveSaving.value = false
+  const currentSubjectId = Number(subjectId)
+  moveSubjectId.value = currentSubjectId
+  moveSectionId.value = Number(sectionId)
+  await loadMoveSections(currentSubjectId)
+  moveModalOpen.value = true
+}
+
+// Not a watch(moveSubjectId, ...) — that would also fire (and reset moveSectionId) when
+// openMoveModal sets the pre-selected defaults above, instead of only on a real user change.
+async function onMoveSubjectChange(newId: number | undefined) {
+  moveSubjectId.value = newId
+  moveSectionId.value = undefined
+  await loadMoveSections(newId)
+}
+
+async function confirmMove() {
+  if (!moveQuestion.value || !moveSectionId.value) return
+  moveSaving.value = true
+  moveError.value = ''
+  try {
+    const formData = new FormData()
+    formData.set('sectionId', String(moveSectionId.value))
+    await $fetch(`/api/admin/questions/${moveQuestion.value.id}`, { method: 'PATCH', body: formData })
+    moveModalOpen.value = false
+    await refreshQuestions()
+  } catch (err) {
+    moveError.value = apiErrorMessage(err, 'Could not move question')
+  } finally {
+    moveSaving.value = false
+  }
 }
 
 const bulkModalOpen = ref(false)
@@ -215,6 +272,14 @@ function correctOption(question: Question) {
               </p>
             </div>
           </NuxtLink>
+          <UButton
+            icon="i-lucide-folder-input"
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            class="shrink-0"
+            @click="openMoveModal(question)"
+          />
           <UButton
             icon="i-lucide-trash-2"
             variant="ghost"
@@ -354,5 +419,47 @@ function correctOption(question: Question) {
       :fixed-section-id="section.id"
       @imported="onBulkImported"
     />
+
+    <UModal
+      v-model:open="moveModalOpen"
+      title="Move question"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField label="Subject">
+            <USelectMenu
+              :model-value="moveSubjectId"
+              :items="(allSubjects || []).map(s => ({ label: s.name, value: s.id }))"
+              value-key="value"
+              class="w-full"
+              @update:model-value="onMoveSubjectChange"
+            />
+          </UFormField>
+          <UFormField label="Section">
+            <USelectMenu
+              v-model="moveSectionId"
+              :items="moveSectionsForSubject.map(s => ({ label: s.name, value: s.id }))"
+              value-key="value"
+              :placeholder="moveSubjectId ? 'Choose a section' : 'Choose a subject first'"
+              :disabled="!moveSubjectId"
+              class="w-full"
+            />
+          </UFormField>
+          <p
+            v-if="moveError"
+            class="text-sm text-error"
+          >
+            {{ moveError }}
+          </p>
+          <UButton
+            label="Move"
+            block
+            :disabled="!moveSectionId"
+            :loading="moveSaving"
+            @click="confirmMove"
+          />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
