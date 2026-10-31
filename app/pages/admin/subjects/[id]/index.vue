@@ -74,9 +74,14 @@ const editChapterError = ref('')
 const savingEditChapter = ref(false)
 
 const bulkModalOpen = ref(false)
+const hierarchyModalOpen = ref(false)
 
 async function onBulkImported() {
   await refreshQuestions()
+}
+
+async function onHierarchyImported() {
+  await Promise.all([refreshDocuments(), refreshSections()])
 }
 
 // Keyed the same way as the template's :key — group.chapterId, or 'none' for the unassigned group.
@@ -309,6 +314,13 @@ async function saveEditChapter() {
             variant="ghost"
             color="neutral"
             @click="expandAllChapters"
+          />
+          <UButton
+            label="Import chapters/sections"
+            icon="i-lucide-table"
+            variant="subtle"
+            color="neutral"
+            @click="hierarchyModalOpen = true"
           />
           <UButton
             label="Bulk import"
@@ -607,6 +619,12 @@ async function saveEditChapter() {
       v-model:open="bulkModalOpen"
       :sections="sectionList ?? []"
       @imported="onBulkImported"
+    />
+
+    <AdminHierarchyImportModal
+      v-model:open="hierarchyModalOpen"
+      :subject-id="subjectId"
+      @imported="onHierarchyImported"
     />
   </div>
 </template>
