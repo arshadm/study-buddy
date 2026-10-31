@@ -52,6 +52,10 @@ export const documents = sqliteTable('documents', {
   filePath: text('file_path'),
   extractedText: text('extracted_text'),
   extractionError: text('extraction_error'),
+  // Only meaningful for role 'chapter' — lets an admin pull a chapter's sections out of student
+  // question selection (see getQuestionStats in weighting.ts) without deleting anything.
+  // syllabus/mark_scheme ignore this; they're always in effect.
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull()
 }, table => [

@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
     title: documents.title,
     filePath: documents.filePath,
     extractionError: documents.extractionError,
+    isActive: documents.isActive,
     createdAt: documents.createdAt,
     updatedAt: documents.updatedAt
   }).from(documents)

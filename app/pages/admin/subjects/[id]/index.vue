@@ -20,7 +20,7 @@ interface Question {
   sectionId: number | null
 }
 
-interface DocumentRow { id: number, role: 'syllabus' | 'mark_scheme' | 'chapter', title: string, filePath: string | null, extractionError: string | null }
+interface DocumentRow { id: number, role: 'syllabus' | 'mark_scheme' | 'chapter', title: string, filePath: string | null, extractionError: string | null, isActive: boolean }
 
 const route = useRoute()
 const subjectId = route.params.id as string
@@ -32,7 +32,7 @@ const { data: documents, refresh: refreshDocuments } = await useFetch<DocumentRo
 
 const chapters = computed(() => documents.value?.filter(d => d.role === 'chapter') ?? [])
 
-interface SectionGroup { chapterId: number | null, chapterTitle: string | null, hasNotes: boolean, sections: Section[] }
+interface SectionGroup { chapterId: number | null, chapterTitle: string | null, hasNotes: boolean, chapterIsActive: boolean, sections: Section[] }
 
 const sectionGroups = computed<SectionGroup[]>(() => {
   const all = sectionList.value ?? []
@@ -40,12 +40,13 @@ const sectionGroups = computed<SectionGroup[]>(() => {
     chapterId: c.id,
     chapterTitle: c.title,
     hasNotes: c.filePath !== null,
+    chapterIsActive: c.isActive,
     sections: all.filter(s => s.chapterDocumentId === c.id)
   }))
   const chapterIds = new Set(chapters.value.map(c => c.id))
   const unassigned = all.filter(s => s.chapterDocumentId === null || !chapterIds.has(s.chapterDocumentId))
   if (unassigned.length > 0) {
-    groups.push({ chapterId: null, chapterTitle: 'No chapter', hasNotes: true, sections: unassigned })
+    groups.push({ chapterId: null, chapterTitle: 'No chapter', hasNotes: true, chapterIsActive: true, sections: unassigned })
   }
   return groups
 })
@@ -197,6 +198,15 @@ async function addChapter() {
 async function deleteChapter(docId: number) {
   await $fetch(`/api/admin/documents/${docId}`, { method: 'DELETE' })
   await Promise.all([refreshDocuments(), refreshSections()])
+}
+
+async function toggleChapterPublish(docId: number) {
+  const chapter = chapters.value.find(c => c.id === docId)
+  if (!chapter) return
+  const formData = new FormData()
+  formData.set('isActive', String(!chapter.isActive))
+  await $fetch(`/api/admin/documents/${docId}`, { method: 'PATCH', body: formData })
+  await refreshDocuments()
 }
 
 function openEditChapter(docId: number) {
@@ -376,6 +386,10 @@ async function saveEditChapter() {
                 v-if="group.chapterId && !group.hasNotes"
                 class="text-xs font-normal normal-case text-warning shrink-0"
               >No notes yet</span>
+              <span
+                v-if="group.chapterId && !group.chapterIsActive"
+                class="text-xs font-normal normal-case text-muted shrink-0"
+              >(unpublished)</span>
             </h3>
             <div
               v-if="group.chapterId"
@@ -388,6 +402,13 @@ async function saveEditChapter() {
                 color="neutral"
                 size="xs"
                 @click="openEditChapter(group.chapterId)"
+              />
+              <UButton
+                :icon="group.chapterIsActive ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+                variant="ghost"
+                :color="group.chapterIsActive ? 'neutral' : 'warning'"
+                size="xs"
+                @click="toggleChapterPublish(group.chapterId)"
               />
               <UButton
                 icon="i-lucide-plus"

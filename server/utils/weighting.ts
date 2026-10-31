@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { db } from '../database/client'
-import { questions, quizSessionQuestions, quizSessions } from '../database/schema'
+import { documents, questions, quizSessionQuestions, quizSessions, sections } from '../database/schema'
 import { effectivePercentSql } from './scoring'
 
 const EFFECTIVE_PERCENT = effectivePercentSql('ssq.')
@@ -61,6 +61,11 @@ export function getQuestionStats(studentId: number, subjectId: number): Question
       MAX(ssq.answered_at) AS last_seen_at,
       AVG(CASE WHEN ${sql.raw(EFFECTIVE_PERCENT)} = 100 THEN ssq.time_spent_ms END) AS avg_correct_time_ms
     FROM ${questions} q
+    -- A question's section may belong to an unpublished chapter, which pulls it out of
+    -- selection without touching q.is_active (see documents.isActive). No section, or a section
+    -- with no chapter, is never excluded by this join.
+    LEFT JOIN ${sections} sec ON sec.id = q.section_id
+    LEFT JOIN ${documents} chap ON chap.id = sec.chapter_document_id
     -- Pre-filtered to this student's completed sessions before joining, not after: a plain
     -- "LEFT JOIN ssq ... LEFT JOIN sessions ... AND student_id = ?" matches every student's
     -- attempts at the first join and only nulls out the session columns for a mismatch, so
@@ -70,6 +75,7 @@ export function getQuestionStats(studentId: number, subjectId: number): Question
       INNER JOIN ${quizSessions} s ON s.id = ssq.quiz_session_id AND s.student_id = ${studentId} AND s.status = 'completed'
     ) ssq ON ssq.question_id = q.id
     WHERE q.subject_id = ${subjectId} AND q.is_active = 1
+      AND (chap.id IS NULL OR chap.is_active = 1)
     GROUP BY q.id
   `)
 

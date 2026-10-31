@@ -1,6 +1,6 @@
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, or, isNull } from 'drizzle-orm'
 import { db } from '../database/client'
-import { subjects, questions, quizSessions, quizSessionSubjects, quizSessionQuestions, paperSections, paperAttempts } from '../database/schema'
+import { subjects, questions, sections, documents, quizSessions, quizSessionSubjects, quizSessionQuestions, paperSections, paperAttempts } from '../database/schema'
 import { pickWeightedQuestionsForSubject } from './weighting'
 
 export interface SubjectAllocation {
@@ -69,8 +69,16 @@ export async function createSessionForAllocations(studentId: number, allocations
   const perSubjectPicks: { subjectId: number, questionId: number }[] = []
 
   for (const allocation of allocations) {
+    // Mirrors the chapter-published filter in weighting.ts's getQuestionStats — kept in sync so
+    // this count (used to warn and to clamp the pick count below) matches what's actually pickable.
     const activeQuestions = await db.select({ id: questions.id }).from(questions)
-      .where(and(eq(questions.subjectId, allocation.subjectId), eq(questions.isActive, true)))
+      .leftJoin(sections, eq(sections.id, questions.sectionId))
+      .leftJoin(documents, eq(documents.id, sections.chapterDocumentId))
+      .where(and(
+        eq(questions.subjectId, allocation.subjectId),
+        eq(questions.isActive, true),
+        or(isNull(documents.id), eq(documents.isActive, true))
+      ))
 
     const expectedTimePerQuestionMs = allocation.timeLimitSeconds !== null && allocation.questionCount > 0
       ? (allocation.timeLimitSeconds * 1000) / allocation.questionCount

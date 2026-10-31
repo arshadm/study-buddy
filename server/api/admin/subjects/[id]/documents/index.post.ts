@@ -61,6 +61,9 @@ export default defineEventHandler(async (event) => {
     filePath,
     extractedText: text,
     extractionError: error,
+    // New chapters start unpublished, same as new subjects — an admin opts in once its sections
+    // and questions are ready. syllabus/mark_scheme aren't gated by this, so they stay active.
+    isActive: role !== 'chapter',
     createdAt: now,
     updatedAt: now
   }).returning({
@@ -70,6 +73,7 @@ export default defineEventHandler(async (event) => {
     title: documents.title,
     filePath: documents.filePath,
     extractionError: documents.extractionError,
+    isActive: documents.isActive,
     createdAt: documents.createdAt,
     updatedAt: documents.updatedAt
   })

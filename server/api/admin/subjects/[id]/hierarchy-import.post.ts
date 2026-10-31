@@ -94,6 +94,9 @@ export default defineEventHandler(async (event) => {
         filePath: null,
         extractedText: null,
         extractionError: null,
+        // New chapters start unpublished, same as the "Add chapter" flow — an admin opts in
+        // once its sections and questions are ready.
+        isActive: false,
         createdAt: now,
         updatedAt: now
       }).returning({ id: documents.id })

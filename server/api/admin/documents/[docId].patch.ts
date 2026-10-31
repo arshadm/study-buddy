@@ -26,6 +26,10 @@ export default defineEventHandler(async (event) => {
     updates.title = title
   }
 
+  if ('isActive' in fields) {
+    updates.isActive = fields.isActive === 'true'
+  }
+
   // Only 'chapter' docs can go without a file — syllabus/mark_scheme always require one
   // (enforced on create too), so removing theirs here would leave them in an invalid state.
   if (fields.removeFile === 'true' && existing.role !== 'chapter') {
@@ -54,6 +58,7 @@ export default defineEventHandler(async (event) => {
     title: documents.title,
     filePath: documents.filePath,
     extractionError: documents.extractionError,
+    isActive: documents.isActive,
     createdAt: documents.createdAt,
     updatedAt: documents.updatedAt
   })
