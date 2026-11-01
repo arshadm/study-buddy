@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, real, uniqueIndex, index, primaryKey } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, integer, text, real, uniqueIndex, index, primaryKey, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -13,10 +13,28 @@ export const users = sqliteTable('users', {
   index('idx_users_role').on(table.role)
 ])
 
+// Admin-managed category tree for organizing subjects (Settings → Categories). Arbitrary depth:
+// parentId null = top-level. A category with children can't be deleted (restrict) — the admin
+// empties it first; sibling-name uniqueness is enforced in the API since SQLite treats NULL
+// parentIds as distinct in a unique index.
+export const categories = sqliteTable('categories', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  parentId: integer('parent_id').references((): AnySQLiteColumn => categories.id, { onDelete: 'restrict' }),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull()
+}, table => [
+  index('idx_categories_parent').on(table.parentId, table.sortOrder)
+])
+
 export const subjects = sqliteTable('subjects', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
   description: text('description'),
+  // Any node in the category tree, not necessarily a leaf. Deleting the category un-files the
+  // subject rather than deleting it.
+  categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
   // Optional custom instructions folded into every LLM grading prompt for this subject's
   // discussion activities — e.g. the grader's role and how strict to be (see claude-cli.ts).
   gradingInstructions: text('grading_instructions'),

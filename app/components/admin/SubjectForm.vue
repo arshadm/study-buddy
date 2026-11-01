@@ -6,6 +6,7 @@ interface Subject {
   id: number
   name: string
   description: string | null
+  categoryId: number | null
 }
 
 const props = defineProps<{ subject?: Subject | null }>()
@@ -23,6 +24,17 @@ const state = reactive({
   description: props.subject?.description ?? ''
 })
 
+const { data: categoryRows } = await useFetch<CategoryRow[]>('/api/admin/categories')
+const categoryId = ref<number | null>(props.subject?.categoryId ?? null)
+const categoryOptions = computed(() => {
+  const rows = categoryRows.value ?? []
+  const labels = categoryPathLabels(rows)
+  return [
+    { label: 'No category', value: null as number | null },
+    ...flattenCategoryTree(buildCategoryTree(rows)).map(n => ({ label: labels.get(n.id) ?? n.name, value: n.id as number | null }))
+  ]
+})
+
 const saving = ref(false)
 const errorMessage = ref('')
 
@@ -31,7 +43,8 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   errorMessage.value = ''
   const body = {
     name: event.data.name,
-    description: event.data.description || undefined
+    description: event.data.description || undefined,
+    categoryId: categoryId.value
   }
   try {
     if (props.subject) {
@@ -74,6 +87,25 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         class="w-full"
         :rows="2"
       />
+    </UFormField>
+
+    <UFormField
+      label="Category"
+      name="categoryId"
+    >
+      <USelectMenu
+        v-model="categoryId"
+        :items="categoryOptions"
+        value-key="value"
+        class="w-full"
+      />
+      <template #help>
+        Manage the category tree under
+        <NuxtLink
+          to="/admin/settings/categories"
+          class="underline"
+        >Settings → Categories</NuxtLink>.
+      </template>
     </UFormField>
 
     <p

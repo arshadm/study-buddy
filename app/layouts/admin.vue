@@ -45,6 +45,13 @@ async function logout() {
               variant="ghost"
               color="neutral"
             />
+            <UButton
+              to="/admin/settings"
+              label="Settings"
+              icon="i-lucide-settings"
+              variant="ghost"
+              color="neutral"
+            />
           </nav>
         </div>
 

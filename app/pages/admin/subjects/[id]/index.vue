@@ -6,6 +6,7 @@ interface Subject {
   name: string
   description: string | null
   isActive: boolean
+  categoryId: number | null
 }
 
 interface Section {

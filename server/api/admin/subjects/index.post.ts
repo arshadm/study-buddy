@@ -1,16 +1,21 @@
 import { z } from 'zod'
 import { db } from '../../../database/client'
 import { subjects } from '../../../database/schema'
+import { getCategory } from '../../../utils/categories'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(100),
-  description: z.string().max(500).optional()
+  description: z.string().max(500).optional(),
+  categoryId: z.number().int().nullable().optional()
 })
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, 'admin')
 
   const body = await readValidatedBody(event, bodySchema.parse)
+  if (body.categoryId != null && !(await getCategory(body.categoryId))) {
+    throw createError({ statusCode: 400, statusMessage: 'Category not found' })
+  }
   const now = Date.now()
 
   const [subject] = await db.insert(subjects).values({

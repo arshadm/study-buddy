@@ -6,9 +6,12 @@ interface Subject {
   name: string
   description: string | null
   isActive: boolean
+  categoryId: number | null
 }
 
 const { data: subjects, refresh } = await useFetch<Subject[]>('/api/admin/subjects')
+const { data: categoryRows } = await useFetch<CategoryRow[]>('/api/admin/categories')
+const categoryLabels = computed(() => categoryPathLabels(categoryRows.value ?? []))
 
 const modalOpen = ref(false)
 
@@ -66,6 +69,13 @@ async function deleteSubject(subject: Subject) {
               v-if="!subject.isActive"
               class="text-xs text-muted font-mono"
             >(draft)</span>
+          </p>
+          <p
+            v-if="subject.categoryId && categoryLabels.get(subject.categoryId)"
+            class="text-xs text-muted flex items-center gap-1"
+          >
+            <UIcon name="i-lucide-folder" />
+            {{ categoryLabels.get(subject.categoryId) }}
           </p>
           <p
             v-if="subject.description"
