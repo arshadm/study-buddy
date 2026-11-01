@@ -1,17 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'student' })
 
-interface Subject {
-  id: number
-  name: string
-  description: string | null
-}
-
-interface SubjectChoice {
-  questionCount: number
-  timeLimitMinutes: number | null
-}
-
 interface CurrentSession {
   sessionId: number
   isPaper: boolean
@@ -20,7 +9,23 @@ interface CurrentSession {
   totalCount: number
 }
 
-const { data: subjects } = await useFetch<Subject[]>('/api/subjects')
+const { data: subjects } = await useFetch<StartSubject[]>('/api/subjects')
+const { data: categoryRows } = await useFetch<CategoryRow[]>('/api/categories')
+
+// Categories with none of this student's subjects anywhere beneath them are pruned. If no
+// subject is categorized at all, the page falls back to the plain grid.
+const subjectTree = computed(() => buildSubjectTree(categoryRows.value ?? [], subjects.value ?? []))
+const treeNodes = computed(() => {
+  const { nodes, uncategorized } = subjectTree.value
+  if (nodes.length === 0 || uncategorized.length === 0) return nodes
+  return [...nodes, {
+    key: 'uncategorized',
+    name: 'Other subjects',
+    subjects: uncategorized,
+    children: [],
+    subjectIds: uncategorized.map(s => s.id)
+  }]
+})
 const { data: currentSession, refresh: refreshCurrentSession } = await useFetch<CurrentSession | null>('/api/sessions/current')
 const abandoning = ref(false)
 const choices = reactive<Record<number, SubjectChoice | undefined>>({})
@@ -48,6 +53,7 @@ const totalMinutes = computed(() => selectedIds.value.reduce((sum, id) => sum + 
 function toggle(id: number) {
   choices[id] = choices[id] ? undefined : { questionCount: 10, timeLimitMinutes: null }
 }
+provide(SUBJECT_CHOICES_KEY, { choices, toggle })
 
 async function startSession() {
   errorMessage.value = ''
@@ -123,70 +129,23 @@ async function startSession() {
       </div>
     </div>
 
-    <div
-      v-if="!currentSession"
-      class="grid gap-3 sm:grid-cols-2"
-    >
+    <template v-if="!currentSession">
+      <StudentCategoryAccordion
+        v-if="treeNodes.length"
+        :nodes="treeNodes"
+        open-first
+      />
       <div
-        v-for="subject in subjects"
-        :key="subject.id"
-        class="rounded-lg border p-4 transition-colors"
-        :class="choices[subject.id]
-          ? 'border-primary bg-primary/5'
-          : 'border-default hover:border-muted'"
+        v-else
+        class="grid gap-3 sm:grid-cols-2"
       >
-        <button
-          type="button"
-          class="w-full text-left"
-          @click="toggle(subject.id)"
-        >
-          <div class="flex items-start justify-between gap-2">
-            <span class="font-semibold">{{ subject.name }}</span>
-            <UIcon
-              v-if="choices[subject.id]"
-              name="i-lucide-check-circle-2"
-              class="text-primary shrink-0 size-5"
-            />
-          </div>
-          <p
-            v-if="subject.description"
-            class="text-sm text-muted mt-1"
-          >
-            {{ subject.description }}
-          </p>
-        </button>
-
-        <div
-          v-if="choices[subject.id]"
-          class="mt-3 pt-3 border-t border-default grid grid-cols-2 gap-3"
-          @click.stop
-        >
-          <UFormField
-            label="Questions"
-            size="xs"
-          >
-            <UInputNumber
-              v-model="choices[subject.id]!.questionCount"
-              class="w-full"
-              :min="1"
-              :max="200"
-            />
-          </UFormField>
-          <UFormField
-            label="Time limit (min)"
-            hint="Optional"
-            size="xs"
-          >
-            <UInputNumber
-              v-model="choices[subject.id]!.timeLimitMinutes"
-              class="w-full"
-              :min="1"
-              placeholder="Untimed"
-            />
-          </UFormField>
-        </div>
+        <StudentSubjectCard
+          v-for="subject in subjects"
+          :key="subject.id"
+          :subject="subject"
+        />
       </div>
-    </div>
+    </template>
 
     <div
       v-if="chosen.length"

@@ -62,3 +62,54 @@ export function descendantIds(node: CategoryNode): Set<number> {
 
 export type CategoryAction = 'add-child' | 'rename' | 'move' | 'up' | 'down' | 'delete'
 export const CATEGORY_ACTION_KEY = Symbol('category-action') as InjectionKey<(action: CategoryAction, node: CategoryNode) => void>
+
+// --- Student start page: categories as a tree of subjects ---
+
+export interface SubjectTreeNode<S> {
+  // Accordion item value — must be a string.
+  key: string
+  name: string
+  // Subjects filed directly under this category.
+  subjects: S[]
+  children: SubjectTreeNode<S>[]
+  // Every subject id in this node's whole subtree — for "N selected" badges.
+  subjectIds: number[]
+}
+
+// Builds the category tree with each subject placed under its category, pruning every
+// category (at any depth) whose subtree contains none of `subjects`. Subjects with no category
+// (or whose category no longer exists) come back separately as `uncategorized`.
+export function buildSubjectTree<S extends { id: number, categoryId: number | null }>(
+  categoryRows: Pick<CategoryRow, 'id' | 'parentId' | 'name' | 'sortOrder'>[],
+  subjects: S[]
+): { nodes: SubjectTreeNode<S>[], uncategorized: S[] } {
+  const known = new Set(categoryRows.map(c => c.id))
+  const subjectsByCategory = new Map<number, S[]>()
+  const uncategorized: S[] = []
+  for (const s of subjects) {
+    if (s.categoryId !== null && known.has(s.categoryId)) {
+      const list = subjectsByCategory.get(s.categoryId) ?? []
+      list.push(s)
+      subjectsByCategory.set(s.categoryId, list)
+    } else {
+      uncategorized.push(s)
+    }
+  }
+
+  const tree = buildCategoryTree(categoryRows.map(c => ({ ...c, subjectCount: 0 })))
+
+  const convert = (nodes: CategoryNode[]): SubjectTreeNode<S>[] => nodes.flatMap((n) => {
+    const children = convert(n.children)
+    const direct = subjectsByCategory.get(n.id) ?? []
+    if (direct.length === 0 && children.length === 0) return []
+    return [{
+      key: `category-${n.id}`,
+      name: n.name,
+      subjects: direct,
+      children,
+      subjectIds: [...direct.map(s => s.id), ...children.flatMap(c => c.subjectIds)]
+    }]
+  })
+
+  return { nodes: convert(tree), uncategorized }
+}
