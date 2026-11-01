@@ -16,6 +16,7 @@ const bulkErrorMessage = ref('')
 const bulkErrors = ref<string[]>([])
 const bulkSuccessMessage = ref('')
 const bulkSaving = ref(false)
+const bulkAutoTag = ref(true)
 
 watch(open, (isOpen) => {
   if (isOpen) return
@@ -50,13 +51,17 @@ async function submitBulkImport() {
   formData.set('sectionId', String(bulkSectionId.value))
   formData.set('type', bulkType.value)
   formData.set('zip', bulkFile.value)
+  formData.set('autoTag', String(bulkAutoTag.value))
 
   try {
-    const result = await $fetch<{ imported: number, questionIds: number[] }>('/api/admin/questions/bulk-import', {
+    const result = await $fetch<{ imported: number, questionIds: number[], autoTagQueued: number }>('/api/admin/questions/bulk-import', {
       method: 'POST',
       body: formData
     })
     bulkSuccessMessage.value = `Imported ${result.imported} question${result.imported === 1 ? '' : 's'}.`
+      + (result.autoTagQueued
+        ? ` Claude is suggesting tags for ${result.autoTagQueued} of them in the background — progress shows on the section's question list.`
+        : '')
     bulkFile.value = null
     emit('imported')
   } catch (err) {
@@ -139,6 +144,12 @@ async function submitBulkImport() {
             Students only see it on the review page after the session.
           </template>
         </p>
+
+        <UCheckbox
+          v-model="bulkAutoTag"
+          label="Suggest tags with Claude"
+          description="For questions with no tags in the CSV, Claude picks tags from this subject's tag list after the import. Edit them afterwards as needed."
+        />
 
         <input
           type="file"

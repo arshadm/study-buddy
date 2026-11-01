@@ -81,8 +81,12 @@ billing. The image has the CLI installed, but **you need to log it in once after
 (and again any time the admin dashboard shows a "Claude CLI needs re-authentication" banner):
 
 ```bash
-kamal app exec -i "claude auth login --claudeai"
+kamal app exec -i "env HOME=/data/claude-home claude auth login --claudeai"
 ```
+
+The `env HOME=/data/claude-home` part matters: the app runs the CLI with that HOME (see
+`getClaudeHomeDir` in `server/utils/claude-cli.ts`), and the container's default HOME (`/root`) is
+not on the persistent volume — a login without it is invisible to the app and lost on redeploy.
 
 This prints an OAuth URL — open it on any device (it doesn't need to be the server), complete
 sign-in, then paste the resulting code back into the terminal. Credentials are stored under
@@ -93,7 +97,7 @@ To check current status without waiting for a grading call to fail, either look 
 the admin dashboard (it has a "Check now" button), or run directly:
 
 ```bash
-kamal app exec -i "claude auth status --json"
+kamal app exec -i "env HOME=/data/claude-home claude auth status --json"
 ```
 
 ### Manual / bare-metal alternative

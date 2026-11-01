@@ -247,3 +247,111 @@ export function buildGradingPrompt(ctx: GradingContext): string {
 
   return parts.join('\n\n')
 }
+
+// --- Tag suggestions from question images ---
+
+export interface SuggestionImage {
+  label: string
+  data: Buffer
+  mediaType: 'image/png' | 'image/jpeg' | 'image/webp'
+}
+
+const TAG_SCHEMA = JSON.stringify({
+  type: 'object',
+  properties: { tags: { type: 'array', items: { type: 'string' } } },
+  required: ['tags'],
+  additionalProperties: false
+})
+
+// Images can't go through a plain-text prompt, and grading runs with every tool disabled (so
+// the CLI can't Read a file path either) — instead the message is sent as a stream-json user turn
+// with inline base64 image blocks. Returns tag names exactly as Claude wrote them; the caller
+// maps them back onto the subject's tag list and drops anything that isn't on it.
+async function runTagSuggestionOnce(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<string[]> {
+  const text = [
+    `These images are from one "${subjectName}" exam question${images.length > 1 ? ` (${images.map(i => i.label).join(', ')})` : ''}.`,
+    'Choose the tags that best describe the topics a student must use to answer it — usually 1 to 4.',
+    'Prefer the specific topic actually being tested over broad or merely incidental ones.',
+    'Use ONLY tags from this list, spelled exactly as written. If none fit, return an empty list.',
+    '',
+    ...tagNames.map(t => `- ${t}`)
+  ].join('\n')
+
+  const message = JSON.stringify({
+    type: 'user',
+    message: {
+      role: 'user',
+      content: [
+        ...images.flatMap(img => [
+          { type: 'text', text: img.label },
+          { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data.toString('base64') } }
+        ]),
+        { type: 'text', text }
+      ]
+    }
+  })
+
+  const { stdout, exitCode } = await runClaudeCli([
+    '-p',
+    '--input-format', 'stream-json',
+    '--output-format', 'stream-json',
+    '--verbose',
+    '--tools', '',
+    '--permission-prompts', 'none',
+    '--no-session-persistence',
+    '--json-schema', TAG_SCHEMA
+  ], `${message}\n`)
+
+  let resultEvent: { is_error?: boolean, result?: unknown, structured_output?: unknown } | undefined
+  for (const line of stdout.split('\n')) {
+    if (!line.trim()) continue
+    try {
+      const event = JSON.parse(line)
+      if (event.type === 'result') resultEvent = event
+    } catch {
+      // non-JSON noise — ignore
+    }
+  }
+
+  if (!resultEvent) {
+    if (isAuthErrorText(stdout)) throw new ClaudeAuthError(stdout.slice(0, 500))
+    throw new ClaudeGradingError(`Claude CLI returned no result (exit ${exitCode}): ${stdout.slice(0, 500)}`)
+  }
+  if (resultEvent.is_error) {
+    const resultText = typeof resultEvent.result === 'string' ? resultEvent.result : JSON.stringify(resultEvent.result)
+    if (isAuthErrorText(resultText)) throw new ClaudeAuthError(resultText)
+    throw new ClaudeGradingError(resultText)
+  }
+
+  let parsed: unknown = resultEvent.structured_output
+  if (parsed === undefined) {
+    try {
+      parsed = typeof resultEvent.result === 'string' ? JSON.parse(resultEvent.result) : resultEvent.result
+    } catch {
+      throw new ClaudeGradingError(`Claude did not return valid JSON: ${String(resultEvent.result).slice(0, 500)}`)
+    }
+  }
+  return z.object({ tags: z.array(z.string()) }).parse(parsed).tags
+}
+
+// Same retry/auth-banner policy as gradeAnswer.
+export async function suggestTagNames(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<string[]> {
+  try {
+    const result = await runTagSuggestionOnce(images, tagNames, subjectName)
+    await recordAuthStatus('ok', null)
+    return result
+  } catch (err) {
+    if (err instanceof ClaudeAuthError) {
+      await recordAuthStatus('needs_reauth', err.message)
+      throw err
+    }
+    try {
+      const result = await runTagSuggestionOnce(images, tagNames, subjectName)
+      await recordAuthStatus('ok', null)
+      return result
+    } catch (retryErr) {
+      if (retryErr instanceof ClaudeAuthError) await recordAuthStatus('needs_reauth', retryErr.message)
+      throw retryErr
+    }
+  }
+}

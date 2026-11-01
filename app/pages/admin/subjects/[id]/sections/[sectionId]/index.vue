@@ -20,6 +20,7 @@ interface Question {
   correctAnswerText: string | null
   options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
   tagIds: number[]
+  autoTagStatus: 'pending' | 'done' | 'failed' | null
 }
 
 interface OpenQuestionSet {
@@ -158,6 +159,28 @@ async function onBulkImported() {
   await refreshQuestions()
 }
 
+// Background Claude tagging after a bulk import: poll the list while any question is still
+// pending so suggested tags appear as they land, and stop once the queue is empty.
+const pendingAutoTagCount = computed(() => (questions.value ?? []).filter(q => q.autoTagStatus === 'pending').length)
+const failedAutoTagIds = computed(() => (questions.value ?? []).filter(q => q.autoTagStatus === 'failed').map(q => q.id))
+let autoTagPoll: ReturnType<typeof setInterval> | null = null
+watch(pendingAutoTagCount, (count) => {
+  if (count > 0 && !autoTagPoll && import.meta.client) {
+    autoTagPoll = setInterval(() => refreshQuestions(), 4000)
+  } else if (count === 0 && autoTagPoll) {
+    clearInterval(autoTagPoll)
+    autoTagPoll = null
+  }
+}, { immediate: true })
+onBeforeUnmount(() => {
+  if (autoTagPoll) clearInterval(autoTagPoll)
+})
+
+async function retryAutoTag(questionIds: number[]) {
+  await $fetch('/api/admin/questions/auto-tag', { method: 'POST', body: { questionIds } })
+  await refreshQuestions()
+}
+
 function correctOption(question: Question) {
   return question.options.find(o => o.isCorrect) ?? null
 }
@@ -207,7 +230,26 @@ function correctOption(question: Question) {
           Questions
           <span class="text-muted font-normal text-sm">({{ questions?.length ?? 0 }})</span>
         </h2>
-        <div class="flex gap-2">
+        <div class="flex items-center gap-2">
+          <span
+            v-if="pendingAutoTagCount"
+            class="flex items-center gap-1.5 text-sm text-muted"
+          >
+            <UIcon
+              name="i-lucide-loader-circle"
+              class="animate-spin"
+            />
+            Suggesting tags · {{ pendingAutoTagCount }} left
+          </span>
+          <UButton
+            v-if="failedAutoTagIds.length"
+            :label="`Retry tagging (${failedAutoTagIds.length} failed)`"
+            icon="i-lucide-rotate-ccw"
+            variant="ghost"
+            color="warning"
+            size="sm"
+            @click="retryAutoTag(failedAutoTagIds)"
+          />
           <UButton
             label="Bulk import"
             icon="i-lucide-upload"
@@ -272,6 +314,23 @@ function correctOption(question: Question) {
                 class="text-xs text-muted truncate"
               >
                 Hint: <MathText :text="question.hintText" />
+              </p>
+              <p
+                v-if="question.autoTagStatus === 'pending'"
+                class="mt-1 flex items-center gap-1 text-xs text-muted"
+              >
+                <UIcon
+                  name="i-lucide-sparkles"
+                  class="animate-pulse"
+                />
+                Suggesting tags…
+              </p>
+              <p
+                v-else-if="question.autoTagStatus === 'failed'"
+                class="mt-1 flex items-center gap-1 text-xs text-warning"
+              >
+                <UIcon name="i-lucide-triangle-alert" />
+                Tag suggestion failed
               </p>
               <div
                 v-if="question.tagIds.length"

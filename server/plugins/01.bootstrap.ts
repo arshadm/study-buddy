@@ -5,10 +5,13 @@ import { db } from '../database/client'
 import { users } from '../database/schema'
 import { hashPasswordScrypt } from '../utils/hash-password'
 import { backfillUncategorizedQuestionsIntoSections } from '../utils/backfill-sections'
+import { drainAutoTagQueue } from '../utils/tag-suggestions'
 
 export default defineNitroPlugin(async () => {
   migrate(db, { migrationsFolder: './server/database/migrations' })
   await backfillUncategorizedQuestionsIntoSections()
+  // Resume any background tag suggestions interrupted by a restart/redeploy.
+  void drainAutoTagQueue()
 
   const [existingAdmin] = await db.select().from(users).where(eq(users.role, 'admin')).limit(1)
 

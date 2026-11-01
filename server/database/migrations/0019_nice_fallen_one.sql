@@ -1,0 +1,1 @@
+ALTER TABLE `questions` ADD `auto_tag_status` text;

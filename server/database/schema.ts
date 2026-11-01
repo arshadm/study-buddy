@@ -108,6 +108,10 @@ export const questions = sqliteTable('questions', {
   // student checks their answer, to mark against. Multiple choice: only on the review page,
   // never mid-session (it would give the answer away).
   markSchemeImagePath: text('mark_scheme_image_path'),
+  // Background Claude tag suggestion (see server/utils/tag-suggestions.ts) — set by bulk import
+  // or a manual retry. Null = never queued. 'pending' rows are picked up again on startup, so a
+  // redeploy mid-batch doesn't lose them.
+  autoTagStatus: text('auto_tag_status', { enum: ['pending', 'done', 'failed'] }),
   difficulty: integer('difficulty'),
   type: text('type', { enum: ['multiple_choice', 'self_marked_image'] }).notNull().default('multiple_choice'),
   // Only meaningful when type is 'multiple_choice' — 'text' carries question_options rows,

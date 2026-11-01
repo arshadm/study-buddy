@@ -6,6 +6,7 @@ import { questions, sections, subjectTags } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage } from '../../../utils/uploads'
 import { normalizeTagName, setQuestionTags } from '../../../utils/subject-tags'
+import { queueAutoTagging } from '../../../utils/tag-suggestions'
 
 const EXTENSION_MIME: Record<string, string> = {
   png: 'image/png',
@@ -245,5 +246,14 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  return { imported: createdIds.length, questionIds: createdIds }
+  // Questions that didn't get tags from the CSV are tagged by Claude in the background (only when
+  // the subject has tags to choose from).
+  let autoTagQueued = 0
+  if (fields.autoTag === 'true' && subjectTagRows.length > 0) {
+    const untagged = createdIds.filter((_, index) => (tagIdsByRow.get(index) ?? []).length === 0)
+    await queueAutoTagging(untagged)
+    autoTagQueued = untagged.length
+  }
+
+  return { imported: createdIds.length, questionIds: createdIds, autoTagQueued }
 })

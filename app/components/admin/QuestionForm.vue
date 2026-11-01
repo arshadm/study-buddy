@@ -95,6 +95,40 @@ watch(tagSubjectId, id => loadTags(id))
 
 const tagItems = computed(() => subjectTags.value.map(t => ({ label: t.name, value: t.id })))
 
+// Claude tag suggestions: run automatically when a question image is chosen, or on demand.
+// Suggestions are merged into the selection for the admin to review — nothing is saved until
+// "Save question".
+const suggestingTags = ref(false)
+const suggestMessage = ref('')
+const suggestError = ref('')
+const canSuggestTags = computed(() => Boolean(tagSubjectId.value) && subjectTags.value.length > 0 && (Boolean(imageFile.value) || Boolean(props.question)))
+
+async function suggestTags() {
+  if (!canSuggestTags.value || suggestingTags.value) return
+  suggestingTags.value = true
+  suggestMessage.value = ''
+  suggestError.value = ''
+  const formData = new FormData()
+  formData.set('subjectId', String(tagSubjectId.value))
+  if (props.question) formData.set('questionId', String(props.question.id))
+  if (imageFile.value) formData.set('image', imageFile.value)
+  if (workedSolutionFile.value) formData.set('workedSolutionImage', workedSolutionFile.value)
+  if (markSchemeFile.value) formData.set('markSchemeImage', markSchemeFile.value)
+  try {
+    const { tagIds: suggested } = await $fetch<{ tagIds: number[] }>('/api/admin/questions/suggest-tags', { method: 'POST', body: formData })
+    const added = suggested.filter(id => !tagIds.value.includes(id))
+    tagIds.value = [...tagIds.value, ...added]
+    const nameOf = (id: number) => subjectTags.value.find(t => t.id === id)?.name ?? '?'
+    suggestMessage.value = suggested.length === 0
+      ? 'Claude didn\'t find a matching tag in this subject\'s list.'
+      : `Claude suggested: ${suggested.map(nameOf).join(', ')}${added.length < suggested.length ? ' (some were already selected)' : ''} — review before saving.`
+  } catch (err) {
+    suggestError.value = apiErrorMessage(err, 'Could not suggest tags')
+  } finally {
+    suggestingTags.value = false
+  }
+}
+
 const hintText = ref(props.question?.hintText ?? '')
 const difficulty = ref<number | undefined>(props.question?.difficulty ?? undefined)
 const type = ref<'multiple_choice' | 'self_marked_image'>(props.question?.type ?? 'multiple_choice')
@@ -134,6 +168,7 @@ function onFileChange(e: Event) {
   if (!file) return
   imageFile.value = file
   imagePreview.value = URL.createObjectURL(file)
+  void suggestTags()
 }
 
 function onWorkedSolutionChange(e: Event) {
@@ -369,15 +404,48 @@ async function onSubmit() {
       label="Tags"
       hint="Optional — from this subject's tag list"
     >
-      <USelectMenu
+      <div
         v-if="tagItems.length"
-        v-model="tagIds"
-        :items="tagItems"
-        value-key="value"
-        multiple
-        placeholder="Choose tags"
-        class="w-full"
-      />
+        class="space-y-2"
+      >
+        <div class="flex gap-2">
+          <USelectMenu
+            v-model="tagIds"
+            :items="tagItems"
+            value-key="value"
+            multiple
+            placeholder="Choose tags"
+            class="min-w-0 flex-1"
+          />
+          <UButton
+            label="Suggest tags"
+            icon="i-lucide-sparkles"
+            variant="subtle"
+            color="neutral"
+            :loading="suggestingTags"
+            :disabled="!canSuggestTags"
+            @click="suggestTags"
+          />
+        </div>
+        <p
+          v-if="suggestingTags"
+          class="text-sm text-muted"
+        >
+          Asking Claude for tags…
+        </p>
+        <p
+          v-else-if="suggestMessage"
+          class="text-sm text-muted"
+        >
+          {{ suggestMessage }}
+        </p>
+        <p
+          v-if="suggestError"
+          class="text-sm text-error"
+        >
+          {{ suggestError }}
+        </p>
+      </div>
       <p
         v-else
         class="text-sm text-muted"

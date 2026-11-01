@@ -32,7 +32,7 @@ async function checkNow() {
       </p>
       <p class="text-xs text-muted truncate">
         {{ status.lastErrorMessage || 'Discussion-activity grading will fail until this is fixed.' }}
-        Run <code>kamal app exec -i "claude auth login --claudeai"</code> over SSH, then check again.
+        Run <code>kamal app exec -i "env HOME=/data/claude-home claude auth login --claudeai"</code> over SSH, then check again.
       </p>
     </div>
     <UButton
