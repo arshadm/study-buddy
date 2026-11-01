@@ -117,6 +117,14 @@ function toggleTag(tagId: number) {
         </UFormField>
       </div>
 
+      <p
+        v-if="tagFilter && tagFilter.totalQuestions === 0"
+        class="text-sm text-warning flex items-center gap-1.5"
+      >
+        <UIcon name="i-lucide-triangle-alert" />
+        No questions available in this subject yet
+      </p>
+
       <div
         v-if="tagFilter?.tags.length"
         class="min-w-0 flex-1 space-y-2"

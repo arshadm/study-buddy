@@ -156,12 +156,17 @@ export async function startSession(studentId: number, requested: RequestedAlloca
     })
   }
 
+  // Refuse up front rather than create a session with nothing in it (which would finish the
+  // moment it opened) — e.g. a subject whose questions are all in an unpublished chapter.
   for (const allocation of allocations) {
-    if (allocation.tagIds!.length === 0) continue
     const matching = await getEligibleQuestionIdsForTags(allocation.subjectId, allocation.tagIds!)
-    if (matching.length === 0) {
-      throw createError({ statusCode: 400, statusMessage: `No ${allocation.subjectName} questions match the selected tags` })
-    }
+    if (matching.length > 0) continue
+    throw createError({
+      statusCode: 400,
+      statusMessage: allocation.tagIds!.length > 0
+        ? `No ${allocation.subjectName} questions match the selected tags`
+        : `${allocation.subjectName} has no questions available yet`
+    })
   }
 
   return createSessionForAllocations(studentId, allocations)
