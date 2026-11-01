@@ -34,7 +34,7 @@ const { choices, toggle } = inject(SUBJECT_CHOICES_KEY)!
 
     <div
       v-if="choices[subject.id]"
-      class="mt-3 pt-3 border-t border-default grid grid-cols-2 gap-3"
+      class="mt-3 pt-3 border-t border-default grid grid-cols-2 items-end gap-3"
       @click.stop
     >
       <UFormField
@@ -50,7 +50,6 @@ const { choices, toggle } = inject(SUBJECT_CHOICES_KEY)!
       </UFormField>
       <UFormField
         label="Time limit (min)"
-        hint="Optional"
         size="xs"
       >
         <UInputNumber
