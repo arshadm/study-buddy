@@ -85,7 +85,7 @@ async function startSession() {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto space-y-8">
+  <div class="space-y-8">
     <div>
       <p class="text-sm font-mono text-primary mb-1">
         01 — Choose subjects
@@ -138,7 +138,7 @@ async function startSession() {
       />
       <div
         v-else
-        class="grid gap-3 sm:grid-cols-2"
+        class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
       >
         <StudentSubjectCard
           v-for="subject in subjects"

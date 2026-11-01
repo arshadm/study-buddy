@@ -55,7 +55,7 @@ function selectedCount(node: SubjectTreeNode<StartSubject>) {
       <div class="space-y-3">
         <div
           v-if="item.node.subjects.length"
-          class="grid gap-3 sm:grid-cols-2"
+          class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
         >
           <StudentSubjectCard
             v-for="subject in item.node.subjects"

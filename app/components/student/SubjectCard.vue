@@ -42,6 +42,10 @@ function onQuestionCountInput(value: number | null) {
   if (choice.value && value !== null) choice.value.questionCount = value
 }
 
+// A selected subject with tags takes the whole grid row, so its pills flow across the page
+// instead of stacking down a narrow card.
+const wide = computed(() => Boolean(choice.value && tagFilter.value?.tags.length))
+
 function toggleTag(tagId: number) {
   const c = choice.value
   if (!c) return
@@ -52,9 +56,10 @@ function toggleTag(tagId: number) {
 <template>
   <div
     class="rounded-lg border p-4 transition-colors"
-    :class="choice
-      ? 'border-primary bg-primary/5'
-      : 'border-default hover:border-muted'"
+    :class="[
+      choice ? 'border-primary bg-primary/5' : 'border-default hover:border-muted',
+      wide ? 'col-span-full' : ''
+    ]"
   >
     <button
       type="button"
@@ -79,10 +84,14 @@ function toggleTag(tagId: number) {
 
     <div
       v-if="choice"
-      class="mt-3 pt-3 border-t border-default space-y-3"
+      class="mt-3 pt-3 border-t border-default"
+      :class="wide ? 'flex flex-col gap-4 md:flex-row md:items-start' : ''"
       @click.stop
     >
-      <div class="grid grid-cols-2 items-end gap-3">
+      <div
+        class="grid grid-cols-2 items-end gap-3"
+        :class="wide ? 'md:w-72 md:shrink-0' : ''"
+      >
         <UFormField
           label="Questions"
           size="xs"
@@ -110,7 +119,7 @@ function toggleTag(tagId: number) {
 
       <div
         v-if="tagFilter?.tags.length"
-        class="space-y-2"
+        class="min-w-0 flex-1 space-y-2"
       >
         <div class="flex items-baseline justify-between gap-2">
           <p class="text-xs font-medium">
@@ -126,12 +135,12 @@ function toggleTag(tagId: number) {
             Clear
           </button>
         </div>
-        <div class="flex flex-wrap gap-1.5">
+        <div class="flex flex-wrap gap-2">
           <button
             v-for="tag in tagFilter.tags"
             :key="tag.id"
             type="button"
-            class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
+            class="rounded-full border px-3 py-1 text-xs whitespace-nowrap transition-colors"
             :class="choice.tagIds.includes(tag.id)
               ? 'border-primary bg-primary text-inverted'
               : 'border-default bg-default text-default hover:border-primary/60'"
