@@ -14,6 +14,7 @@ interface ExistingQuestion {
   optionFormat: 'text' | 'image'
   correctAnswerText: string | null
   options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
+  tagIds: number[]
 }
 
 const route = useRoute()

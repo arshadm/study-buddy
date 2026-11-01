@@ -5,6 +5,7 @@ import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage, deleteQuestionImage } from '../../../utils/uploads'
 import { parseQuestionType, parseOptionFormat, parseCorrectAnswerText, parseDifficulty } from '../../../utils/question-validation'
 import { buildQuestionOptions } from '../../../utils/build-question-options'
+import { assertTagsBelongToSubject, dropTagsOutsideSubject, getTagIdsByQuestion, parseTagIdsField, setQuestionTags } from '../../../utils/subject-tags'
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, 'admin')
@@ -28,6 +29,11 @@ export default defineEventHandler(async (event) => {
     updates.sectionId = sectionId
     updates.subjectId = section.subjectId
   }
+  // Validated against the subject the question will end up in (it may be moving sections).
+  const resolvedSubjectId = updates.subjectId ?? existing.subjectId
+  const tagIds = parseTagIdsField(fields.tagIds)
+  if (tagIds) await assertTagsBelongToSubject(resolvedSubjectId, tagIds)
+
   if ('hintText' in fields) updates.hintText = fields.hintText || null
   if ('difficulty' in fields) updates.difficulty = parseDifficulty(fields)
 
@@ -85,6 +91,9 @@ export default defineEventHandler(async (event) => {
 
   await db.update(questions).set(updates).where(eq(questions.id, id))
 
+  if (tagIds) setQuestionTags(id, tagIds)
+  else if (resolvedSubjectId !== existing.subjectId) await dropTagsOutsideSubject(id, resolvedSubjectId)
+
   let oldOptions: { optionImagePath: string | null }[] = []
   if (newOptions || clearOptions) {
     oldOptions = await db.select({ optionImagePath: questionOptions.optionImagePath }).from(questionOptions).where(eq(questionOptions.questionId, id))
@@ -121,5 +130,5 @@ export default defineEventHandler(async (event) => {
   }
 
   const [updated] = await db.select().from(questions).where(eq(questions.id, id)).limit(1)
-  return updated
+  return { ...updated!, tagIds: (await getTagIdsByQuestion([id])).get(id) ?? [] }
 })

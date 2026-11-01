@@ -2,9 +2,10 @@ import AdmZip from 'adm-zip'
 import { parse } from 'csv-parse/sync'
 import { eq } from 'drizzle-orm'
 import { db } from '../../../database/client'
-import { questions, sections } from '../../../database/schema'
+import { questions, sections, subjectTags } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage } from '../../../utils/uploads'
+import { normalizeTagName, setQuestionTags } from '../../../utils/subject-tags'
 
 const EXTENSION_MIME: Record<string, string> = {
   png: 'image/png',
@@ -99,6 +100,30 @@ export default defineEventHandler(async (event) => {
     return filename ? saveZipImage(filename) : null
   }
 
+  // Optional `tags` column in both import types: semicolon-separated names from this subject's
+  // tag list, matched case-insensitively (e.g. "Vectors; proof by induction"). Unknown names fail
+  // the import — tags must already exist on the subject (add or import them there first).
+  const subjectTagRows = await db.select({ id: subjectTags.id, name: subjectTags.name }).from(subjectTags)
+    .where(eq(subjectTags.subjectId, section.subjectId))
+  const tagIdByName = new Map(subjectTagRows.map(t => [t.name.toLowerCase(), t.id]))
+  const tagIdsByRow = new Map<number, number[]>()
+
+  function validateTags(row: Record<string, string>, index: number, rowNumber: number) {
+    const names = (row.tags ?? '').split(';').map(normalizeTagName).filter(Boolean)
+    const ids = new Set<number>()
+    for (const name of names) {
+      const id = tagIdByName.get(name.toLowerCase())
+      if (id === undefined) errors.push(`Row ${rowNumber}: "${name}" isn't one of this subject's tags`)
+      else ids.add(id)
+    }
+    tagIdsByRow.set(index, [...ids])
+  }
+
+  function applyTags(questionId: number, index: number) {
+    const ids = tagIdsByRow.get(index) ?? []
+    if (ids.length > 0) setQuestionTags(questionId, ids)
+  }
+
   if (importType === 'multiple_choice') {
     if (!('image_filename' in records[0]!) || !('correct_answer' in records[0]!)) {
       throw createError({ statusCode: 400, statusMessage: 'CSV must have image_filename and correct_answer columns' })
@@ -124,13 +149,14 @@ export default defineEventHandler(async (event) => {
       }
 
       validateMarkScheme(row, rowNumber)
+      validateTags(row, index, rowNumber)
     })
 
     if (errors.length > 0) {
       throw createError({ statusCode: 400, statusMessage: 'CSV validation failed', data: { errors } })
     }
 
-    for (const row of records) {
+    for (const [index, row] of records.entries()) {
       const entry = imagesByName.get(row.image_filename!.trim())!
       const type = EXTENSION_MIME[extensionOf(entry.entryName)]!
       const imagePath = await saveQuestionImage({ data: entry.getData(), type })
@@ -158,6 +184,7 @@ export default defineEventHandler(async (event) => {
         updatedAt: now
       }).returning()
 
+      applyTags(question!.id, index)
       createdIds.push(question!.id)
     }
   } else {
@@ -182,13 +209,14 @@ export default defineEventHandler(async (event) => {
       }
 
       validateMarkScheme(row, rowNumber)
+      validateTags(row, index, rowNumber)
     })
 
     if (errors.length > 0) {
       throw createError({ statusCode: 400, statusMessage: 'CSV validation failed', data: { errors } })
     }
 
-    for (const row of records) {
+    for (const [index, row] of records.entries()) {
       const questionEntry = imagesByName.get(row.question_image_filename!.trim())!
       const imagePath = await saveQuestionImage({
         data: questionEntry.getData(),
@@ -212,6 +240,7 @@ export default defineEventHandler(async (event) => {
         updatedAt: now
       }).returning()
 
+      applyTags(question!.id, index)
       createdIds.push(question!.id)
     }
   }

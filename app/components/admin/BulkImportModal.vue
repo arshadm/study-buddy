@@ -129,7 +129,9 @@ async function submitBulkImport() {
         </p>
         <p class="text-sm text-muted">
           Optionally add a <code>mark_scheme_image_filename</code> column for a mark scheme image
-          per question — leave a row's cell blank when it has none.
+          per question — leave a row's cell blank when it has none — and a <code>tags</code>
+          column of semicolon-separated tag names from this subject's tag list
+          (e.g. <code>Vectors; Proof by induction</code>).
           <template v-if="bulkType === 'self_marked_image'">
             Students see it beside the answer image when they check their work.
           </template>

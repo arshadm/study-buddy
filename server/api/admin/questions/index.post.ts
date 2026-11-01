@@ -5,6 +5,7 @@ import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage } from '../../../utils/uploads'
 import { parseQuestionType, parseOptionFormat, parseCorrectAnswerText, parseDifficulty } from '../../../utils/question-validation'
 import { buildQuestionOptions } from '../../../utils/build-question-options'
+import { assertTagsBelongToSubject, parseTagIdsField, setQuestionTags } from '../../../utils/subject-tags'
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, 'admin')
@@ -25,6 +26,9 @@ export default defineEventHandler(async (event) => {
   if (!files.image) {
     throw createError({ statusCode: 400, statusMessage: 'Question image is required' })
   }
+
+  const tagIds = parseTagIdsField(fields.tagIds) ?? []
+  await assertTagsBelongToSubject(subjectId, tagIds)
 
   const type = parseQuestionType(fields)
   const difficulty = parseDifficulty(fields)
@@ -76,5 +80,7 @@ export default defineEventHandler(async (event) => {
     )
   }
 
-  return question
+  if (tagIds.length > 0) setQuestionTags(question.id, tagIds)
+
+  return { ...question, tagIds }
 })

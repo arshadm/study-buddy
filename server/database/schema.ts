@@ -124,6 +124,27 @@ export const questions = sqliteTable('questions', {
   index('idx_questions_section').on(table.sectionId)
 ])
 
+// A subject's tag vocabulary (Subject page → Tags). Questions can only be tagged from their own
+// subject's set — enforced in the API (server/utils/subject-tags.ts), since SQLite can't express
+// "tag.subject_id = question.subject_id" as a constraint. Names are unique per subject,
+// case-insensitively (also API-enforced; the index below catches exact duplicates).
+export const subjectTags = sqliteTable('subject_tags', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  createdAt: integer('created_at').notNull()
+}, table => [
+  uniqueIndex('idx_subject_tags_subject_name').on(table.subjectId, table.name)
+])
+
+export const questionTags = sqliteTable('question_tags', {
+  questionId: integer('question_id').notNull().references(() => questions.id, { onDelete: 'cascade' }),
+  tagId: integer('tag_id').notNull().references(() => subjectTags.id, { onDelete: 'cascade' })
+}, table => [
+  primaryKey({ columns: [table.questionId, table.tagId] }),
+  index('idx_question_tags_tag').on(table.tagId)
+])
+
 export const questionOptions = sqliteTable('question_options', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   questionId: integer('question_id').notNull().references(() => questions.id, { onDelete: 'cascade' }),

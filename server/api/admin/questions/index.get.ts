@@ -1,6 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '../../../database/client'
 import { questions, questionOptions } from '../../../database/schema'
+import { getTagIdsByQuestion } from '../../../utils/subject-tags'
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, 'admin')
@@ -29,5 +30,7 @@ export default defineEventHandler(async (event) => {
     optionsByQuestion.get(option.questionId)!.push(option)
   }
 
-  return questionRows.map(q => ({ ...q, options: optionsByQuestion.get(q.id) || [] }))
+  const tagIdsByQuestion = await getTagIdsByQuestion(questionRows.map(q => q.id))
+
+  return questionRows.map(q => ({ ...q, options: optionsByQuestion.get(q.id) || [], tagIds: tagIdsByQuestion.get(q.id) ?? [] }))
 })

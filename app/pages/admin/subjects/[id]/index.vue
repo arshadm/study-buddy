@@ -313,6 +313,16 @@ async function saveEditChapter() {
     </div>
 
     <div class="space-y-3">
+      <h2 class="text-lg font-bold tracking-tight">
+        Tags
+      </h2>
+      <p class="text-sm text-muted">
+        The tags available to questions in this subject. Tag a question from its edit form.
+      </p>
+      <AdminSubjectTags :subject-id="subjectId" />
+    </div>
+
+    <div class="space-y-3">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-bold tracking-tight">
           Chapters

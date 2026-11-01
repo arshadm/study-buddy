@@ -33,6 +33,7 @@ async function onSaved() {
       v-if="section"
       :fixed-section-id="section.id"
       :fixed-section-name="section.name"
+      :fixed-subject-id="Number(subjectId)"
       @saved="onSaved"
     />
   </div>

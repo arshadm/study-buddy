@@ -17,12 +17,17 @@ interface ExistingQuestion {
   optionFormat: 'text' | 'image'
   correctAnswerText: string | null
   options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
+  tagIds: number[]
 }
+interface SubjectTag { id: number, name: string }
 
 const props = defineProps<{
   question?: ExistingQuestion | null
   fixedSectionId?: number
   fixedSectionName?: string
+  // Set alongside fixedSectionId (the "new question in this section" flow) so the tag picker
+  // knows which subject's tags to offer without a subject dropdown.
+  fixedSubjectId?: number
 }>()
 const emit = defineEmits<{ saved: [] }>()
 
@@ -73,6 +78,22 @@ watch(chapterId, (newId, oldId) => {
   if (props.fixedSectionId || newId === oldId) return
   sectionId.value = undefined
 })
+
+// Tags come from the subject the question is (or will be) in; switching subject drops any
+// selected tags that don't exist in the new one.
+const tagSubjectId = computed(() => props.fixedSubjectId ?? subjectId.value)
+const subjectTags = ref<SubjectTag[]>([])
+const tagIds = ref<number[]>([...(props.question?.tagIds ?? [])])
+
+async function loadTags(id: number | undefined) {
+  subjectTags.value = id ? await requestFetch<SubjectTag[]>(`/api/admin/subjects/${id}/tags`) : []
+  const available = new Set(subjectTags.value.map(t => t.id))
+  tagIds.value = tagIds.value.filter(t => available.has(t))
+}
+await loadTags(tagSubjectId.value)
+watch(tagSubjectId, id => loadTags(id))
+
+const tagItems = computed(() => subjectTags.value.map(t => ({ label: t.name, value: t.id })))
 
 const hintText = ref(props.question?.hintText ?? '')
 const difficulty = ref<number | undefined>(props.question?.difficulty ?? undefined)
@@ -190,6 +211,8 @@ async function onSubmit() {
       formData.set('correctAnswerText', correctAnswerText.value.trim())
     }
   }
+
+  formData.set('tagIds', JSON.stringify(tagIds.value))
 
   if (imageFile.value) formData.set('image', imageFile.value)
   if (workedSolutionFile.value) formData.set('workedSolutionImage', workedSolutionFile.value)
@@ -341,6 +364,36 @@ async function onSubmit() {
       The student uploads a photo of their own working, then marks themselves right or wrong
       against the worked solution below — so a worked solution image is required for this type.
     </p>
+
+    <UFormField
+      label="Tags"
+      hint="Optional — from this subject's tag list"
+    >
+      <USelectMenu
+        v-if="tagItems.length"
+        v-model="tagIds"
+        :items="tagItems"
+        value-key="value"
+        multiple
+        placeholder="Choose tags"
+        class="w-full"
+      />
+      <p
+        v-else
+        class="text-sm text-muted"
+      >
+        <template v-if="tagSubjectId">
+          This subject has no tags yet — add some under Tags on the
+          <NuxtLink
+            :to="`/admin/subjects/${tagSubjectId}`"
+            class="underline"
+          >subject page</NuxtLink>.
+        </template>
+        <template v-else>
+          Choose a subject first.
+        </template>
+      </p>
+    </UFormField>
 
     <UFormField
       label="Hint"

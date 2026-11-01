@@ -19,6 +19,7 @@ interface Question {
   optionFormat: 'text' | 'image'
   correctAnswerText: string | null
   options: { id: number, optionText: string | null, optionImagePath: string | null, isCorrect: boolean }[]
+  tagIds: number[]
 }
 
 interface OpenQuestionSet {
@@ -38,6 +39,8 @@ const sectionId = route.params.sectionId as string
 
 const { data: sections, refresh: refreshSection } = await useFetch<Section[]>(`/api/admin/subjects/${subjectId}/sections`)
 const section = computed(() => sections.value?.find(s => String(s.id) === sectionId) ?? null)
+const { data: subjectTags } = await useFetch<{ id: number, name: string }[]>(`/api/admin/subjects/${subjectId}/tags`)
+const tagNameById = computed(() => new Map((subjectTags.value ?? []).map(t => [t.id, t.name])))
 const { data: questions, refresh: refreshQuestions } = await useFetch<Question[]>('/api/admin/questions', {
   query: { sectionId }
 })
@@ -270,6 +273,20 @@ function correctOption(question: Question) {
               >
                 Hint: <MathText :text="question.hintText" />
               </p>
+              <div
+                v-if="question.tagIds.length"
+                class="mt-1 flex flex-wrap gap-1"
+              >
+                <UBadge
+                  v-for="tagId in question.tagIds"
+                  :key="tagId"
+                  :label="tagNameById.get(tagId) ?? '?'"
+                  icon="i-lucide-tag"
+                  variant="subtle"
+                  color="neutral"
+                  size="sm"
+                />
+              </div>
             </div>
           </NuxtLink>
           <UButton

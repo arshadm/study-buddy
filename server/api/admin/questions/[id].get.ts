@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../../../database/client'
 import { questions, questionOptions } from '../../../database/schema'
+import { getTagIdsByQuestion } from '../../../utils/subject-tags'
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, 'admin')
@@ -16,5 +17,5 @@ export default defineEventHandler(async (event) => {
     .where(eq(questionOptions.questionId, id))
     .orderBy(questionOptions.sortOrder)
 
-  return { ...question, options }
+  return { ...question, options, tagIds: (await getTagIdsByQuestion([id])).get(id) ?? [] }
 })
