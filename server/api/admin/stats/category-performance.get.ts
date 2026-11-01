@@ -1,7 +1,8 @@
 import { and, eq, gte, isNotNull, isNull, or } from 'drizzle-orm'
 import { db } from '../../../database/client'
-import { sections, questions, quizSessions, quizSessionQuestions, paperAttempts } from '../../../database/schema'
+import { users, sections, questions, quizSessions, quizSessionQuestions, paperAttempts } from '../../../database/schema'
 import { computeWindows, WINDOWS_DAYS, DAY_MS } from '../../../utils/performance-windows'
+import { excludeTestUsers } from '../../../utils/test-users'
 
 // Mirrors subject-performance.get.ts one level down — sections double as "categories" for
 // this (see server/utils/weighting.ts, which weights question selection the same way).
@@ -23,9 +24,11 @@ export default defineEventHandler(async (event) => {
   }).from(quizSessionQuestions)
     .innerJoin(quizSessions, eq(quizSessions.id, quizSessionQuestions.quizSessionId))
     .innerJoin(questions, eq(questions.id, quizSessionQuestions.questionId))
+    .innerJoin(users, eq(users.id, quizSessions.studentId))
     .leftJoin(paperAttempts, eq(paperAttempts.id, quizSessions.paperAttemptId))
     .where(and(
       eq(quizSessions.status, 'completed'),
+      excludeTestUsers(),
       gte(quizSessions.startedAt, cutoff),
       isNotNull(questions.sectionId),
       or(isNull(quizSessions.paperAttemptId), eq(paperAttempts.status, 'completed'))

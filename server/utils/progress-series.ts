@@ -1,6 +1,9 @@
 import { sql } from 'drizzle-orm'
 import { db } from '../database/client'
 import { effectivePercentSql } from './scoring'
+import { excludeTestUsersSql } from './test-users'
+
+const NOT_TEST_USER = excludeTestUsersSql('u')
 
 export interface ProgressPoint {
   x: number // startedAt timestamp, ms
@@ -66,7 +69,7 @@ export function getPaperAttemptsProgress(): StudentSeries[] {
     FROM paper_attempts pa
     INNER JOIN users u ON u.id = pa.student_id
     INNER JOIN quiz_sessions qs ON qs.paper_attempt_id = pa.id
-    WHERE pa.status = 'completed'
+    WHERE pa.status = 'completed' AND ${sql.raw(NOT_TEST_USER)}
     GROUP BY pa.id
     ORDER BY pa.started_at ASC
   `)
@@ -89,7 +92,7 @@ export function getSubjectSessionsProgress(): SubjectProgress[] {
     INNER JOIN users u ON u.id = qs.student_id
     INNER JOIN subjects sub ON sub.id = ssq.subject_id
     LEFT JOIN paper_attempts pa ON pa.id = qs.paper_attempt_id
-    WHERE qs.paper_attempt_id IS NULL OR pa.status = 'completed'
+    WHERE (qs.paper_attempt_id IS NULL OR pa.status = 'completed') AND ${sql.raw(NOT_TEST_USER)}
     GROUP BY ssq.subject_id, qs.id
     ORDER BY qs.started_at ASC
   `)
@@ -109,6 +112,7 @@ export function getSubjectSessionsProgress(): SubjectProgress[] {
     INNER JOIN open_question_set_attempts oqsa ON oqsa.id = oqa.set_attempt_id AND oqsa.status = 'completed'
     INNER JOIN users u ON u.id = oqsa.student_id
     INNER JOIN subjects sub ON sub.id = oqsa.subject_id
+    WHERE ${sql.raw(NOT_TEST_USER)}
     GROUP BY oqsa.id
     ORDER BY oqsa.started_at ASC
   `)

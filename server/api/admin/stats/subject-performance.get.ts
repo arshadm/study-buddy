@@ -1,7 +1,8 @@
 import { and, eq, gte, isNull, or } from 'drizzle-orm'
 import { db } from '../../../database/client'
-import { subjects, quizSessions, quizSessionQuestions, paperAttempts, openQuestionAttempts, openQuestionSetAttempts } from '../../../database/schema'
+import { users, subjects, quizSessions, quizSessionQuestions, paperAttempts, openQuestionAttempts, openQuestionSetAttempts } from '../../../database/schema'
 import { computeWindows, WINDOWS_DAYS, DAY_MS } from '../../../utils/performance-windows'
+import { excludeTestUsers } from '../../../utils/test-users'
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, 'admin')
@@ -20,9 +21,11 @@ export default defineEventHandler(async (event) => {
     startedAt: quizSessions.startedAt
   }).from(quizSessionQuestions)
     .innerJoin(quizSessions, eq(quizSessions.id, quizSessionQuestions.quizSessionId))
+    .innerJoin(users, eq(users.id, quizSessions.studentId))
     .leftJoin(paperAttempts, eq(paperAttempts.id, quizSessions.paperAttemptId))
     .where(and(
       eq(quizSessions.status, 'completed'),
+      excludeTestUsers(),
       gte(quizSessions.startedAt, cutoff),
       // A mock-paper section is only counted once the whole paper is done, not
       // as each section individually finishes.
@@ -37,8 +40,10 @@ export default defineEventHandler(async (event) => {
     startedAt: openQuestionSetAttempts.startedAt
   }).from(openQuestionAttempts)
     .innerJoin(openQuestionSetAttempts, eq(openQuestionSetAttempts.id, openQuestionAttempts.setAttemptId))
+    .innerJoin(users, eq(users.id, openQuestionSetAttempts.studentId))
     .where(and(
       eq(openQuestionSetAttempts.status, 'completed'),
+      excludeTestUsers(),
       gte(openQuestionSetAttempts.startedAt, cutoff)
     ))
 
