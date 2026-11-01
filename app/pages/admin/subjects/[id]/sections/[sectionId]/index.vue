@@ -189,7 +189,7 @@ function correctOption(question: Question) {
 <template>
   <div
     v-if="section"
-    class="max-w-3xl mx-auto space-y-8"
+    class="space-y-8"
   >
     <div class="flex items-center gap-3">
       <UButton

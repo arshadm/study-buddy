@@ -61,7 +61,7 @@ async function submitTestGrade() {
 </script>
 
 <template>
-  <div class="max-w-xl mx-auto space-y-6">
+  <div class="space-y-6">
     <h1 class="text-2xl font-bold tracking-tight">
       Test grading
     </h1>

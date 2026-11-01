@@ -44,7 +44,7 @@ const percent = computed(() => {
 <template>
   <div
     v-if="data"
-    class="max-w-2xl mx-auto space-y-8"
+    class="space-y-8"
   >
     <UButton
       label="Back to student"

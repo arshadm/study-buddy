@@ -198,10 +198,7 @@ watch(sessionId, loadOverview)
 </script>
 
 <template>
-  <div
-    v-if="overview"
-    class="max-w-2xl mx-auto"
-  >
+  <div v-if="overview">
     <div class="sticky top-0 z-10 -mx-4 px-4 py-3 bg-default/95 backdrop-blur border-b border-default space-y-3">
       <div class="flex items-center justify-between">
         <p class="text-sm font-mono text-muted">

@@ -83,7 +83,7 @@ function summaryLabel(status: SummaryItem['status']) {
 <template>
   <div
     v-if="state"
-    class="max-w-2xl mx-auto space-y-6"
+    class="space-y-6"
   >
     <div>
       <p class="text-sm font-mono text-muted">

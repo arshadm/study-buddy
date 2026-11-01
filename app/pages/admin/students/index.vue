@@ -19,7 +19,7 @@ async function onSaved() {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto space-y-6">
+  <div class="space-y-6">
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-bold tracking-tight">
         Students

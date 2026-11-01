@@ -35,7 +35,7 @@ async function startPaper(paper: Paper) {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto space-y-8">
+  <div class="space-y-8">
     <div>
       <h1 class="text-2xl font-bold tracking-tight">
         Mock papers

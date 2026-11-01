@@ -148,7 +148,7 @@ const previewOpen = computed({
 <template>
   <div
     v-if="student"
-    class="max-w-2xl mx-auto space-y-8"
+    class="space-y-8"
   >
     <div>
       <p class="text-sm text-muted font-mono">

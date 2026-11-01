@@ -94,11 +94,11 @@ function revealHint() {
 <template>
   <div class="space-y-6">
     <div class="rounded-lg border border-default overflow-hidden bg-elevated">
-      <img
+      <ZoomableImage
         :src="imageUrl"
         alt="Question"
-        class="w-full h-auto max-h-[28rem] object-contain bg-white"
-      >
+        img-class="w-full h-auto max-h-[70vh] object-contain bg-white"
+      />
     </div>
 
     <div v-if="type === 'multiple_choice' && optionFormat === 'image'">
@@ -141,12 +141,12 @@ function revealHint() {
           <p class="text-xs font-mono text-muted mb-1">
             Your working
           </p>
-          <img
+          <ZoomableImage
             v-if="submittedAnswerImageUrl"
             :src="submittedAnswerImageUrl"
             alt="Your submitted answer"
-            class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
-          >
+            img-class="w-full max-h-[28rem] object-contain rounded-md bg-white border border-default"
+          />
           <p
             v-if="submittedAnswerImageUrl"
             class="text-xs text-muted"
@@ -174,21 +174,21 @@ function revealHint() {
             <p class="text-xs font-mono text-muted mb-1">
               Worked solution
             </p>
-            <img
+            <ZoomableImage
               :src="workedSolutionImageUrl"
               alt="Worked solution"
-              class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
-            >
+              img-class="w-full max-h-[28rem] object-contain rounded-md bg-white border border-default"
+            />
           </div>
           <div v-if="markSchemeImageUrl">
             <p class="text-xs font-mono text-muted mb-1">
               Mark scheme
             </p>
-            <img
+            <ZoomableImage
               :src="markSchemeImageUrl"
               alt="Mark scheme"
-              class="w-full max-h-80 object-contain rounded-md bg-white border border-default"
-            >
+              img-class="w-full max-h-[36rem] object-contain rounded-md bg-white border border-default"
+            />
           </div>
         </div>
       </div>

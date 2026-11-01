@@ -54,7 +54,7 @@ const cards = computed(() => [
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto space-y-8">
+  <div class="space-y-8">
     <h1 class="text-2xl font-bold tracking-tight">
       Admin
     </h1>

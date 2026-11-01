@@ -110,11 +110,11 @@ const timeSpentLabel = computed(() => {
       </div>
     </div>
 
-    <img
+    <ZoomableImage
       :src="item.imageUrl"
       alt="Question"
-      class="w-full max-h-64 object-contain rounded-md bg-white border border-default"
-    >
+      img-class="w-full max-h-[32rem] object-contain rounded-md bg-white border border-default"
+    />
 
     <div
       v-if="item.type === 'multiple_choice' && item.optionFormat === 'text'"
@@ -164,12 +164,12 @@ const timeSpentLabel = computed(() => {
     >
       <div>
         <span class="text-xs text-muted font-mono block mb-1">Your answer</span>
-        <img
+        <ZoomableImage
           v-if="item.submittedAnswerImageUrl"
           :src="item.submittedAnswerImageUrl"
           alt="Your submitted answer"
-          class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
-        >
+          img-class="w-full max-h-[28rem] object-contain rounded-md bg-white border border-default"
+        />
         <p
           v-else
           class="text-muted"
@@ -183,19 +183,19 @@ const timeSpentLabel = computed(() => {
       >
         <div>
           <span class="text-xs text-muted font-mono block mb-1">Worked solution</span>
-          <img
+          <ZoomableImage
             :src="item.workedSolutionImageUrl"
             alt="Worked solution"
-            class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
-          >
+            img-class="w-full max-h-[28rem] object-contain rounded-md bg-white border border-default"
+          />
         </div>
         <div v-if="item.markSchemeImageUrl">
           <span class="text-xs text-muted font-mono block mb-1">Mark scheme</span>
-          <img
+          <ZoomableImage
             :src="item.markSchemeImageUrl"
             alt="Mark scheme"
-            class="w-full max-h-80 object-contain rounded-md bg-white border border-default"
-          >
+            img-class="w-full max-h-[36rem] object-contain rounded-md bg-white border border-default"
+          />
         </div>
       </div>
     </div>
@@ -210,12 +210,12 @@ const timeSpentLabel = computed(() => {
         size="sm"
         @click="solutionRevealed = true"
       />
-      <img
+      <ZoomableImage
         v-else
         :src="item.workedSolutionImageUrl"
         alt="Worked solution"
-        class="w-full max-h-64 object-contain rounded-md bg-white border border-default mt-2"
-      >
+        img-class="w-full max-h-[32rem] object-contain rounded-md bg-white border border-default mt-2"
+      />
     </div>
 
     <div v-if="item.type === 'multiple_choice' && item.markSchemeImageUrl">
@@ -228,12 +228,12 @@ const timeSpentLabel = computed(() => {
         size="sm"
         @click="markSchemeRevealed = true"
       />
-      <img
+      <ZoomableImage
         v-else
         :src="item.markSchemeImageUrl"
         alt="Mark scheme"
-        class="w-full max-h-80 object-contain rounded-md bg-white border border-default mt-2"
-      >
+        img-class="w-full max-h-[36rem] object-contain rounded-md bg-white border border-default mt-2"
+      />
     </div>
   </div>
 </template>

@@ -80,7 +80,7 @@ const totalMinutes = computed(() => Math.round((paper.value?.sections ?? []).red
 <template>
   <div
     v-if="paper"
-    class="max-w-2xl mx-auto space-y-8"
+    class="space-y-8"
   >
     <div class="flex items-center gap-3">
       <UButton

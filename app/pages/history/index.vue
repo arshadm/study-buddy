@@ -75,7 +75,7 @@ function dateLabel(ms: number) {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto space-y-8">
+  <div class="space-y-8">
     <div class="flex items-center justify-between gap-4">
       <h1 class="text-2xl font-bold tracking-tight">
         History

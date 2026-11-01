@@ -33,7 +33,7 @@ function sectionPercent(section: Section) {
 <template>
   <div
     v-if="data"
-    class="max-w-2xl mx-auto space-y-8"
+    class="space-y-8"
   >
     <div class="rounded-lg border border-default p-6 text-center">
       <p class="text-sm font-mono text-primary mb-2">

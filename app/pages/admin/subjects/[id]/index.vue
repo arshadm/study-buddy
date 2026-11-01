@@ -261,7 +261,7 @@ async function saveEditChapter() {
 <template>
   <div
     v-if="subject"
-    class="max-w-3xl mx-auto space-y-8"
+    class="space-y-8"
   >
     <div class="flex items-center gap-3">
       <UButton

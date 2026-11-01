@@ -32,7 +32,7 @@ async function deleteSet() {
 <template>
   <div
     v-if="set && section"
-    class="max-w-xl mx-auto space-y-6"
+    class="space-y-6"
   >
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">
