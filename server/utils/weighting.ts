@@ -179,9 +179,14 @@ export function weightedSampleWithoutReplacement(items: WeightedQuestion[], n: n
 // weighted by its own factor (see computeWeight). This keeps a section's share of picks
 // proportional to its weakness rather than to how many questions it happens to contain — a
 // section with 50 questions no longer crowds out a weaker section with only 5.
-export function pickWeightedQuestionsForSubject(studentId: number, subjectId: number, count: number, expectedTimePerQuestionMs: number): number[] {
-  const stats = getQuestionStats(studentId, subjectId)
-  const targetDifficulty = computeTargetDifficulty(stats)
+//
+// `allowedQuestionIds` (the start page's tag filter) restricts which questions can be picked.
+// Target difficulty is still computed from the whole subject, so a narrow tag filter doesn't
+// skew it.
+export function pickWeightedQuestionsForSubject(studentId: number, subjectId: number, count: number, expectedTimePerQuestionMs: number, allowedQuestionIds?: Set<number>): number[] {
+  const allStats = getQuestionStats(studentId, subjectId)
+  const targetDifficulty = computeTargetDifficulty(allStats)
+  const stats = allowedQuestionIds ? allStats.filter(s => allowedQuestionIds.has(s.questionId)) : allStats
 
   const bySection = new Map<SectionKey, QuestionStatsRow[]>()
   for (const s of stats) {

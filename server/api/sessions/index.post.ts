@@ -9,7 +9,8 @@ const bodySchema = z.object({
   allocations: z.array(z.object({
     subjectId: z.number().int(),
     questionCount: z.number().int().min(1).max(200),
-    timeLimitSeconds: z.number().int().min(30).max(24 * 60 * 60).nullable()
+    timeLimitSeconds: z.number().int().min(30).max(24 * 60 * 60).nullable(),
+    tagIds: z.array(z.number().int()).max(500).optional()
   })).min(1)
 })
 

@@ -1,8 +1,9 @@
-import { eq, and, inArray, or, isNull } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { db } from '../database/client'
-import { subjects, questions, sections, documents, quizSessions, quizSessionSubjects, quizSessionQuestions, paperSections, paperAttempts } from '../database/schema'
+import { subjects, quizSessions, quizSessionSubjects, quizSessionQuestions, paperSections, paperAttempts } from '../database/schema'
 import { pickWeightedQuestionsForSubject } from './weighting'
 import { assertSubjectsAssigned } from './student-subjects'
+import { getEligibleQuestionIdsForTags } from './question-pool'
 
 export interface SubjectAllocation {
   subjectId: number
@@ -12,6 +13,8 @@ export interface SubjectAllocation {
   // session is untimed (see createSessionForAllocations) — mixing a timed and an untimed
   // subject into one shared countdown would be misleading since all picks are merged together.
   timeLimitSeconds: number | null
+  // Start-page tag filter: only questions with ANY of these tags are picked. Empty/absent = all.
+  tagIds?: number[]
 }
 
 // Never expires when timeLimitSeconds is null.
@@ -70,16 +73,10 @@ export async function createSessionForAllocations(studentId: number, allocations
   const perSubjectPicks: { subjectId: number, questionId: number }[] = []
 
   for (const allocation of allocations) {
-    // Mirrors the chapter-published filter in weighting.ts's getQuestionStats — kept in sync so
-    // this count (used to warn and to clamp the pick count below) matches what's actually pickable.
-    const activeQuestions = await db.select({ id: questions.id }).from(questions)
-      .leftJoin(sections, eq(sections.id, questions.sectionId))
-      .leftJoin(documents, eq(documents.id, sections.chapterDocumentId))
-      .where(and(
-        eq(questions.subjectId, allocation.subjectId),
-        eq(questions.isActive, true),
-        or(isNull(documents.id), eq(documents.isActive, true))
-      ))
+    // Same filter as weighting.ts's getQuestionStats (see question-pool.ts), narrowed by the
+    // allocation's tags — this is the pool the pick below is clamped to and restricted to.
+    const tagIds = allocation.tagIds ?? []
+    const activeQuestions = await getEligibleQuestionIdsForTags(allocation.subjectId, tagIds)
 
     const expectedTimePerQuestionMs = allocation.timeLimitSeconds !== null && allocation.questionCount > 0
       ? (allocation.timeLimitSeconds * 1000) / allocation.questionCount
@@ -93,7 +90,8 @@ export async function createSessionForAllocations(studentId: number, allocations
       studentId,
       allocation.subjectId,
       Math.min(allocation.questionCount, activeQuestions.length),
-      expectedTimePerQuestionMs
+      expectedTimePerQuestionMs,
+      tagIds.length > 0 ? new Set(activeQuestions) : undefined
     )
 
     for (const questionId of pickedIds) {
@@ -125,6 +123,7 @@ export interface RequestedAllocation {
   subjectId: number
   questionCount: number
   timeLimitSeconds: number | null
+  tagIds?: number[]
 }
 
 export async function startSession(studentId: number, requested: RequestedAllocation[]) {
@@ -152,8 +151,17 @@ export async function startSession(studentId: number, requested: RequestedAlloca
       subjectId: subject.id,
       subjectName: subject.name,
       questionCount: r.questionCount,
-      timeLimitSeconds: r.timeLimitSeconds
+      timeLimitSeconds: r.timeLimitSeconds,
+      tagIds: r.tagIds ?? []
     })
+  }
+
+  for (const allocation of allocations) {
+    if (allocation.tagIds!.length === 0) continue
+    const matching = await getEligibleQuestionIdsForTags(allocation.subjectId, allocation.tagIds!)
+    if (matching.length === 0) {
+      throw createError({ statusCode: 400, statusMessage: `No ${allocation.subjectName} questions match the selected tags` })
+    }
   }
 
   return createSessionForAllocations(studentId, allocations)

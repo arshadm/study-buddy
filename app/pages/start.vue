@@ -51,7 +51,7 @@ const allTimed = computed(() => selectedIds.value.length > 0 && selectedIds.valu
 const totalMinutes = computed(() => selectedIds.value.reduce((sum, id) => sum + (choices[id]?.timeLimitMinutes ?? 0), 0))
 
 function toggle(id: number) {
-  choices[id] = choices[id] ? undefined : { questionCount: 10, timeLimitMinutes: null }
+  choices[id] = choices[id] ? undefined : { questionCount: 10, timeLimitMinutes: null, tagIds: [] }
 }
 provide(SUBJECT_CHOICES_KEY, { choices, toggle })
 
@@ -65,7 +65,8 @@ async function startSession() {
         allocations: selectedIds.value.map(id => ({
           subjectId: id,
           questionCount: choices[id]!.questionCount,
-          timeLimitSeconds: choices[id]!.timeLimitMinutes ? Math.round(choices[id]!.timeLimitMinutes! * 60) : null
+          timeLimitSeconds: choices[id]!.timeLimitMinutes ? Math.round(choices[id]!.timeLimitMinutes! * 60) : null,
+          tagIds: choices[id]!.tagIds
         }))
       }
     })
