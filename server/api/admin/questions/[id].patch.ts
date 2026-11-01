@@ -69,6 +69,15 @@ export default defineEventHandler(async (event) => {
     workedSolutionReplaced = true
   }
 
+  let markSchemeReplaced = false
+  if (files.markSchemeImage) {
+    updates.markSchemeImagePath = await saveQuestionImage(files.markSchemeImage)
+    markSchemeReplaced = true
+  } else if (fields.removeMarkSchemeImage === 'true') {
+    updates.markSchemeImagePath = null
+    markSchemeReplaced = true
+  }
+
   const resolvedWorkedSolution = workedSolutionReplaced ? updates.workedSolutionImagePath : existing.workedSolutionImagePath
   if (resolvedType === 'self_marked_image' && !resolvedWorkedSolution) {
     throw createError({ statusCode: 400, statusMessage: 'A worked solution image is required for self-marked questions' })
@@ -106,6 +115,9 @@ export default defineEventHandler(async (event) => {
   }
   if (workedSolutionReplaced && existing.workedSolutionImagePath) {
     await deleteQuestionImage(existing.workedSolutionImagePath)
+  }
+  if (markSchemeReplaced && existing.markSchemeImagePath) {
+    await deleteQuestionImage(existing.markSchemeImagePath)
   }
 
   const [updated] = await db.select().from(questions).where(eq(questions.id, id)).limit(1)

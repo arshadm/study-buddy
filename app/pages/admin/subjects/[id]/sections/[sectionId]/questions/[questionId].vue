@@ -7,6 +7,7 @@ interface ExistingQuestion {
   sectionId: number | null
   imagePath: string
   workedSolutionImagePath: string | null
+  markSchemeImagePath: string | null
   hintText: string | null
   difficulty: number | null
   type: 'multiple_choice' | 'self_marked_image'

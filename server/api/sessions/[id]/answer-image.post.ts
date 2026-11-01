@@ -53,6 +53,7 @@ export default defineEventHandler(async (event) => {
 
   return {
     submittedAnswerImageUrl: `/uploads/${newPath}`,
-    workedSolutionImageUrl: question.workedSolutionImagePath ? `/uploads/${question.workedSolutionImagePath}` : null
+    workedSolutionImageUrl: question.workedSolutionImagePath ? `/uploads/${question.workedSolutionImagePath}` : null,
+    markSchemeImageUrl: question.type === 'self_marked_image' && question.markSchemeImagePath ? `/uploads/${question.markSchemeImagePath}` : null
   }
 })

@@ -43,6 +43,7 @@ export async function getSessionReview(session: typeof quizSessions.$inferSelect
       sectionName: question.sectionId !== null ? (sectionsById.get(question.sectionId)?.name ?? null) : null,
       imageUrl: `/uploads/${question.imagePath}`,
       workedSolutionImageUrl: question.workedSolutionImagePath ? `/uploads/${question.workedSolutionImagePath}` : null,
+      markSchemeImageUrl: question.markSchemeImagePath ? `/uploads/${question.markSchemeImagePath}` : null,
       hintText: question.hintText,
       hintUsed: sq.hintUsed,
       flagged: sq.flagged,

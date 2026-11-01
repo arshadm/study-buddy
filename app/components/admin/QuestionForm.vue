@@ -10,6 +10,7 @@ interface ExistingQuestion {
   sectionId: number | null
   imagePath: string
   workedSolutionImagePath: string | null
+  markSchemeImagePath: string | null
   hintText: string | null
   difficulty: number | null
   type: 'multiple_choice' | 'self_marked_image'
@@ -91,6 +92,10 @@ const workedSolutionFile = ref<File | null>(null)
 const workedSolutionPreview = ref<string | null>(props.question?.workedSolutionImagePath ? `/uploads/${props.question.workedSolutionImagePath}` : null)
 const removeWorkedSolution = ref(false)
 
+const markSchemeFile = ref<File | null>(null)
+const markSchemePreview = ref<string | null>(props.question?.markSchemeImagePath ? `/uploads/${props.question.markSchemeImagePath}` : null)
+const removeMarkScheme = ref(false)
+
 const saving = ref(false)
 const errorMessage = ref('')
 
@@ -122,6 +127,20 @@ function clearWorkedSolution() {
   workedSolutionFile.value = null
   workedSolutionPreview.value = null
   removeWorkedSolution.value = true
+}
+
+function onMarkSchemeChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  markSchemeFile.value = file
+  markSchemePreview.value = URL.createObjectURL(file)
+  removeMarkScheme.value = false
+}
+
+function clearMarkScheme() {
+  markSchemeFile.value = null
+  markSchemePreview.value = null
+  removeMarkScheme.value = true
 }
 
 function validate(): string | null {
@@ -175,6 +194,8 @@ async function onSubmit() {
   if (imageFile.value) formData.set('image', imageFile.value)
   if (workedSolutionFile.value) formData.set('workedSolutionImage', workedSolutionFile.value)
   else if (removeWorkedSolution.value) formData.set('removeWorkedSolutionImage', 'true')
+  if (markSchemeFile.value) formData.set('markSchemeImage', markSchemeFile.value)
+  else if (removeMarkScheme.value) formData.set('removeMarkSchemeImage', 'true')
 
   try {
     if (props.question) {
@@ -364,6 +385,36 @@ async function onSubmit() {
             color="neutral"
             size="sm"
             @click="clearWorkedSolution"
+          />
+        </div>
+      </div>
+    </UFormField>
+
+    <UFormField
+      label="Mark scheme image"
+      :hint="type === 'self_marked_image' ? 'Optional — shown beside the worked solution when the student checks their answer' : 'Optional — shown to the student on the review page only'"
+    >
+      <div class="space-y-3">
+        <img
+          v-if="markSchemePreview"
+          :src="markSchemePreview"
+          alt="Mark scheme preview"
+          class="max-h-64 rounded-md border border-default bg-white object-contain"
+        >
+        <div class="flex items-center gap-3">
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            class="text-sm"
+            @change="onMarkSchemeChange"
+          >
+          <UButton
+            v-if="markSchemePreview"
+            label="Remove"
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            @click="clearMarkScheme"
           />
         </div>
       </div>

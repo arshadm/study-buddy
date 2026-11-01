@@ -81,6 +81,24 @@ export default defineEventHandler(async (event) => {
   const now = Date.now()
   const createdIds: number[] = []
 
+  async function saveZipImage(filename: string) {
+    const entry = imagesByName.get(filename)!
+    return saveQuestionImage({ data: entry.getData(), type: EXTENSION_MIME[extensionOf(entry.entryName)]! })
+  }
+
+  // Optional in both import types — leave the column out, or a row's cell blank, for no mark scheme.
+  function validateMarkScheme(row: Record<string, string>, rowNumber: number) {
+    const filename = row.mark_scheme_image_filename?.trim()
+    if (filename && !imagesByName.has(filename)) {
+      errors.push(`Row ${rowNumber}: no mark scheme image named "${filename}" found in the zip`)
+    }
+  }
+
+  async function saveMarkScheme(row: Record<string, string>) {
+    const filename = row.mark_scheme_image_filename?.trim()
+    return filename ? saveZipImage(filename) : null
+  }
+
   if (importType === 'multiple_choice') {
     if (!('image_filename' in records[0]!) || !('correct_answer' in records[0]!)) {
       throw createError({ statusCode: 400, statusMessage: 'CSV must have image_filename and correct_answer columns' })
@@ -104,6 +122,8 @@ export default defineEventHandler(async (event) => {
       if (explanationFilename && !imagesByName.has(explanationFilename)) {
         errors.push(`Row ${rowNumber}: no explanation image named "${explanationFilename}" found in the zip`)
       }
+
+      validateMarkScheme(row, rowNumber)
     })
 
     if (errors.length > 0) {
@@ -130,6 +150,7 @@ export default defineEventHandler(async (event) => {
         sectionId,
         imagePath,
         workedSolutionImagePath,
+        markSchemeImagePath: await saveMarkScheme(row),
         type: 'multiple_choice',
         optionFormat: 'image',
         correctAnswerText: row.correct_answer!.trim(),
@@ -159,6 +180,8 @@ export default defineEventHandler(async (event) => {
       } else if (!imagesByName.has(answerImageFilename)) {
         errors.push(`Row ${rowNumber}: no image named "${answerImageFilename}" found in the zip`)
       }
+
+      validateMarkScheme(row, rowNumber)
     })
 
     if (errors.length > 0) {
@@ -183,6 +206,7 @@ export default defineEventHandler(async (event) => {
         sectionId,
         imagePath,
         workedSolutionImagePath,
+        markSchemeImagePath: await saveMarkScheme(row),
         type: 'self_marked_image',
         createdAt: now,
         updatedAt: now

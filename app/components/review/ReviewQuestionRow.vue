@@ -13,6 +13,7 @@ const props = defineProps<{
     sectionName?: string | null
     imageUrl: string
     workedSolutionImageUrl: string | null
+    markSchemeImageUrl: string | null
     hintUsed: boolean
     flagged: boolean
     timeSpentMs: number | null
@@ -29,6 +30,7 @@ const props = defineProps<{
 }>()
 
 const solutionRevealed = ref(false)
+const markSchemeRevealed = ref(false)
 
 const SELF_MARK_LABELS: Record<number, string> = {
   0: 'Completely wrong',
@@ -175,13 +177,26 @@ const timeSpentLabel = computed(() => {
           Not submitted
         </p>
       </div>
-      <div v-if="item.workedSolutionImageUrl">
-        <span class="text-xs text-muted font-mono block mb-1">Worked solution</span>
-        <img
-          :src="item.workedSolutionImageUrl"
-          alt="Worked solution"
-          class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
-        >
+      <div
+        v-if="item.workedSolutionImageUrl"
+        class="space-y-3"
+      >
+        <div>
+          <span class="text-xs text-muted font-mono block mb-1">Worked solution</span>
+          <img
+            :src="item.workedSolutionImageUrl"
+            alt="Worked solution"
+            class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
+          >
+        </div>
+        <div v-if="item.markSchemeImageUrl">
+          <span class="text-xs text-muted font-mono block mb-1">Mark scheme</span>
+          <img
+            :src="item.markSchemeImageUrl"
+            alt="Mark scheme"
+            class="w-full max-h-80 object-contain rounded-md bg-white border border-default"
+          >
+        </div>
       </div>
     </div>
 
@@ -200,6 +215,24 @@ const timeSpentLabel = computed(() => {
         :src="item.workedSolutionImageUrl"
         alt="Worked solution"
         class="w-full max-h-64 object-contain rounded-md bg-white border border-default mt-2"
+      >
+    </div>
+
+    <div v-if="item.type === 'multiple_choice' && item.markSchemeImageUrl">
+      <UButton
+        v-if="!markSchemeRevealed"
+        label="Show mark scheme"
+        icon="i-lucide-clipboard-check"
+        variant="subtle"
+        color="neutral"
+        size="sm"
+        @click="markSchemeRevealed = true"
+      />
+      <img
+        v-else
+        :src="item.markSchemeImageUrl"
+        alt="Mark scheme"
+        class="w-full max-h-80 object-contain rounded-md bg-white border border-default mt-2"
       >
     </div>
   </div>

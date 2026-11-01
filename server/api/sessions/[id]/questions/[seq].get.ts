@@ -76,6 +76,9 @@ export default defineEventHandler(async (event) => {
     // The client gates showing this behind its own "Check answer" button — uploading a photo
     // of their working is optional, so reveal no longer depends on having submitted one.
     workedSolutionImageUrl: questionRow.workedSolutionImagePath ? `/uploads/${questionRow.workedSolutionImagePath}` : null,
+    // Self-marked only mid-session (revealed with the worked solution, client-gated the same
+    // way). A multiple-choice mark scheme would give the answer away, so it's review-page only.
+    markSchemeImageUrl: questionRow.type === 'self_marked_image' && questionRow.markSchemeImagePath ? `/uploads/${questionRow.markSchemeImagePath}` : null,
     selfMarkScorePercent: questionRow.type === 'self_marked_image' ? current.selfMarkScorePercent : null,
     hintUsed: current.hintUsed,
     flagged: current.flagged,

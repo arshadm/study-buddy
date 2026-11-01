@@ -26,6 +26,7 @@ const props = defineProps<{
   submittedAnswerText: string | null
   submittedAnswerImageUrl: string | null
   workedSolutionImageUrl: string | null
+  markSchemeImageUrl: string | null
   selfMarkScorePercent: number | null
   hintUsed: boolean
   flagged: boolean
@@ -165,15 +166,30 @@ function revealHint() {
             @change="onAnswerImageChange"
           >
         </div>
-        <div v-if="solutionRevealed && workedSolutionImageUrl">
-          <p class="text-xs font-mono text-muted mb-1">
-            Worked solution
-          </p>
-          <img
-            :src="workedSolutionImageUrl"
-            alt="Worked solution"
-            class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
-          >
+        <div
+          v-if="solutionRevealed && workedSolutionImageUrl"
+          class="space-y-3"
+        >
+          <div>
+            <p class="text-xs font-mono text-muted mb-1">
+              Worked solution
+            </p>
+            <img
+              :src="workedSolutionImageUrl"
+              alt="Worked solution"
+              class="w-full max-h-56 object-contain rounded-md bg-white border border-default"
+            >
+          </div>
+          <div v-if="markSchemeImageUrl">
+            <p class="text-xs font-mono text-muted mb-1">
+              Mark scheme
+            </p>
+            <img
+              :src="markSchemeImageUrl"
+              alt="Mark scheme"
+              class="w-full max-h-80 object-contain rounded-md bg-white border border-default"
+            >
+          </div>
         </div>
       </div>
 

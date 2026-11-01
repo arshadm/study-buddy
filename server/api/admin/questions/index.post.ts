@@ -42,6 +42,7 @@ export default defineEventHandler(async (event) => {
 
   const imagePath = await saveQuestionImage(files.image)
   const workedSolutionImagePath = files.workedSolutionImage ? await saveQuestionImage(files.workedSolutionImage) : null
+  const markSchemeImagePath = files.markSchemeImage ? await saveQuestionImage(files.markSchemeImage) : null
   const now = Date.now()
 
   const [question] = await db.insert(questions).values({
@@ -49,6 +50,7 @@ export default defineEventHandler(async (event) => {
     sectionId,
     imagePath,
     workedSolutionImagePath,
+    markSchemeImagePath,
     hintText: fields.hintText || null,
     difficulty,
     type,

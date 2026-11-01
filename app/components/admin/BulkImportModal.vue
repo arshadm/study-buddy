@@ -127,6 +127,16 @@ async function submitBulkImport() {
           <code>answer_image_filename</code> columns. Each row creates a self-marked question —
           the answer image is what the student checks their own answer against.
         </p>
+        <p class="text-sm text-muted">
+          Optionally add a <code>mark_scheme_image_filename</code> column for a mark scheme image
+          per question — leave a row's cell blank when it has none.
+          <template v-if="bulkType === 'self_marked_image'">
+            Students see it beside the answer image when they check their work.
+          </template>
+          <template v-else>
+            Students only see it on the review page after the session.
+          </template>
+        </p>
 
         <input
           type="file"

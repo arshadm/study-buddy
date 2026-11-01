@@ -104,6 +104,10 @@ export const questions = sqliteTable('questions', {
   // Required (enforced in the API, not the DB) when type is 'self_marked_image', since
   // that's what the student checks their own uploaded answer against.
   workedSolutionImagePath: text('worked_solution_image_path'),
+  // Optional for every question type. Self-marked: shown beside the worked solution once the
+  // student checks their answer, to mark against. Multiple choice: only on the review page,
+  // never mid-session (it would give the answer away).
+  markSchemeImagePath: text('mark_scheme_image_path'),
   difficulty: integer('difficulty'),
   type: text('type', { enum: ['multiple_choice', 'self_marked_image'] }).notNull().default('multiple_choice'),
   // Only meaningful when type is 'multiple_choice' — 'text' carries question_options rows,

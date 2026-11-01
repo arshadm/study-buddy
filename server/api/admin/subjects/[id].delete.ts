@@ -26,6 +26,7 @@ export default defineEventHandler(async (event) => {
   const imagePaths = [
     ...subjectQuestions.map(q => q.imagePath),
     ...subjectQuestions.map(q => q.workedSolutionImagePath).filter((p): p is string => p !== null),
+    ...subjectQuestions.map(q => q.markSchemeImagePath).filter((p): p is string => p !== null),
     ...optionRows.map(o => o.optionImagePath).filter((p): p is string => p !== null)
   ]
 

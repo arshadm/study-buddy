@@ -11,6 +11,7 @@ interface Question {
   submittedAnswerText: string | null
   submittedAnswerImageUrl: string | null
   workedSolutionImageUrl: string | null
+  markSchemeImageUrl: string | null
   selfMarkScorePercent: number | null
   hintUsed: boolean
   flagged: boolean
@@ -143,12 +144,13 @@ async function uploadAnswerImage(file: File) {
     const formData = new FormData()
     formData.set('sequenceIndex', String(currentIndex.value))
     formData.set('answerImage', file)
-    const result = await $fetch<{ submittedAnswerImageUrl: string, workedSolutionImageUrl: string | null }>(
+    const result = await $fetch<{ submittedAnswerImageUrl: string, workedSolutionImageUrl: string | null, markSchemeImageUrl: string | null }>(
       `/api/sessions/${sessionId.value}/answer-image`,
       { method: 'POST', body: formData }
     )
     currentQuestion.value.submittedAnswerImageUrl = result.submittedAnswerImageUrl
     currentQuestion.value.workedSolutionImageUrl = result.workedSolutionImageUrl
+    currentQuestion.value.markSchemeImageUrl = result.markSchemeImageUrl
   } catch {
     // ignore transient upload errors — the student can just try uploading again
   } finally {
@@ -263,6 +265,7 @@ watch(sessionId, loadOverview)
         :submitted-answer-text="currentQuestion.submittedAnswerText"
         :submitted-answer-image-url="currentQuestion.submittedAnswerImageUrl"
         :worked-solution-image-url="currentQuestion.workedSolutionImageUrl"
+        :mark-scheme-image-url="currentQuestion.markSchemeImageUrl"
         :self-mark-score-percent="currentQuestion.selfMarkScorePercent"
         :hint-used="currentQuestion.hintUsed"
         :flagged="currentQuestion.flagged"

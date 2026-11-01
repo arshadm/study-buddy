@@ -1,0 +1,1 @@
+ALTER TABLE `questions` ADD `mark_scheme_image_path` text;

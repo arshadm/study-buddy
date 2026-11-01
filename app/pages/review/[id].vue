@@ -7,6 +7,7 @@ interface ReviewItem {
   sectionName?: string | null
   imageUrl: string
   workedSolutionImageUrl: string | null
+  markSchemeImageUrl: string | null
   hintText: string | null
   hintUsed: boolean
   flagged: boolean
