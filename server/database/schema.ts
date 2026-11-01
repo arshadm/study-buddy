@@ -25,6 +25,18 @@ export const subjects = sqliteTable('subjects', {
   updatedAt: integer('updated_at').notNull()
 })
 
+// Which subjects each student can see and practise. A student with no rows here sees no
+// subjects at all — access is opt-in per student, granted by the admin on the student page.
+// Admins aren't subject to this; it only filters the student-facing endpoints.
+export const studentSubjects = sqliteTable('student_subjects', {
+  studentId: integer('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at').notNull()
+}, table => [
+  primaryKey({ columns: [table.studentId, table.subjectId] }),
+  index('idx_student_subjects_subject').on(table.subjectId)
+])
+
 export const sections = sqliteTable('sections', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   subjectId: integer('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),

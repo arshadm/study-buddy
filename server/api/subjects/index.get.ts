@@ -1,9 +1,18 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../../database/client'
-import { subjects } from '../../database/schema'
+import { studentSubjects, subjects } from '../../database/schema'
 
 export default defineEventHandler(async (event) => {
-  await requireUserSession(event)
+  const { user } = await requireUserSession(event)
 
-  return db.select().from(subjects).where(eq(subjects.isActive, true)).orderBy(subjects.name)
+  if (user.role === 'admin') {
+    return db.select().from(subjects).where(eq(subjects.isActive, true)).orderBy(subjects.name)
+  }
+
+  // Students only see the subjects an admin has assigned to them.
+  const rows = await db.select({ subject: subjects }).from(subjects)
+    .innerJoin(studentSubjects, and(eq(studentSubjects.subjectId, subjects.id), eq(studentSubjects.studentId, user.id)))
+    .where(eq(subjects.isActive, true))
+    .orderBy(subjects.name)
+  return rows.map(r => r.subject)
 })

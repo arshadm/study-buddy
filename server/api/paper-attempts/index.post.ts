@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '../../database/client'
 import { papers, paperSections, paperAttempts, quizSessions } from '../../database/schema'
 import { startPaperSection } from '../../utils/session-selection'
+import { assertSubjectsAssigned } from '../../utils/student-subjects'
 
 const bodySchema = z.object({
   paperId: z.number().int()
@@ -25,10 +26,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Paper not found' })
   }
 
-  const sectionCount = await db.$count(paperSections, eq(paperSections.paperId, paperId))
-  if (sectionCount === 0) {
+  const paperSubjectRows = await db.select({ subjectId: paperSections.subjectId }).from(paperSections)
+    .where(eq(paperSections.paperId, paperId))
+  if (paperSubjectRows.length === 0) {
     throw createError({ statusCode: 400, statusMessage: 'This paper has no sections configured yet' })
   }
+  await assertSubjectsAssigned(user!.id, paperSubjectRows.map(r => r.subjectId))
 
   const now = Date.now()
   const [attempt] = await db.insert(paperAttempts).values({

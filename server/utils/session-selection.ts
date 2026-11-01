@@ -2,6 +2,7 @@ import { eq, and, inArray, or, isNull } from 'drizzle-orm'
 import { db } from '../database/client'
 import { subjects, questions, sections, documents, quizSessions, quizSessionSubjects, quizSessionQuestions, paperSections, paperAttempts } from '../database/schema'
 import { pickWeightedQuestionsForSubject } from './weighting'
+import { assertSubjectsAssigned } from './student-subjects'
 
 export interface SubjectAllocation {
   subjectId: number
@@ -132,6 +133,8 @@ export async function startSession(studentId: number, requested: RequestedAlloca
   }
 
   const subjectIds = requested.map(r => r.subjectId)
+  await assertSubjectsAssigned(studentId, subjectIds)
+
   const chosenSubjects = await db.select().from(subjects)
     .where(and(inArray(subjects.id, subjectIds), eq(subjects.isActive, true)))
 

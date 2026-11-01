@@ -1,16 +1,20 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '../../database/client'
 import { openQuestionSets, openQuestions, openQuestionSetAttempts, subjects } from '../../database/schema'
+import { getAssignedSubjectIds } from '../../utils/student-subjects'
 
 export default defineEventHandler(async (event) => {
   const { user } = await requireRole(event, 'student')
+
+  const assignedSubjectIds = [...await getAssignedSubjectIds(user!.id)]
+  if (assignedSubjectIds.length === 0) return []
 
   const sets = await db.select({
     id: openQuestionSets.id,
     title: openQuestionSets.title,
     subjectId: openQuestionSets.subjectId
   }).from(openQuestionSets)
-    .where(eq(openQuestionSets.isActive, true))
+    .where(and(eq(openQuestionSets.isActive, true), inArray(openQuestionSets.subjectId, assignedSubjectIds)))
     .orderBy(asc(openQuestionSets.createdAt))
 
   if (sets.length === 0) return []

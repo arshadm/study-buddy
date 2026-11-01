@@ -95,6 +95,43 @@ async function toggleActive() {
   await refresh()
 }
 
+interface Subject { id: number, name: string, isActive: boolean }
+const { data: allSubjects } = await useFetch<Subject[]>('/api/admin/subjects')
+const { data: assigned } = await useFetch<{ subjectIds: number[] }>(`/api/admin/students/${id}/subjects`)
+const subjectItems = computed(() => (allSubjects.value ?? []).map(s => ({
+  subjectId: s.id,
+  label: s.name,
+  description: s.isActive ? undefined : 'Inactive'
+})))
+const selectedSubjectIds = ref<number[]>([])
+watch(assigned, (a) => {
+  if (a) selectedSubjectIds.value = [...a.subjectIds]
+}, { immediate: true })
+const subjectsDirty = computed(() => {
+  const saved = new Set(assigned.value?.subjectIds ?? [])
+  return selectedSubjectIds.value.length !== saved.size || selectedSubjectIds.value.some(sid => !saved.has(sid))
+})
+const savingSubjects = ref(false)
+const subjectsMessage = ref('')
+const subjectsError = ref('')
+
+async function saveSubjects() {
+  savingSubjects.value = true
+  subjectsMessage.value = ''
+  subjectsError.value = ''
+  try {
+    assigned.value = await $fetch<{ subjectIds: number[] }>(`/api/admin/students/${id}/subjects`, {
+      method: 'PUT',
+      body: { subjectIds: selectedSubjectIds.value }
+    })
+    subjectsMessage.value = 'Subjects saved'
+  } catch (err) {
+    subjectsError.value = apiErrorMessage(err, 'Could not save subjects')
+  } finally {
+    savingSubjects.value = false
+  }
+}
+
 function dateLabel(ms: number) {
   return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -168,6 +205,51 @@ const previewOpen = computed({
         size="sm"
         @click="toggleActive"
       />
+    </div>
+
+    <div class="rounded-lg border border-default p-4 space-y-4">
+      <div>
+        <h2 class="text-lg font-bold tracking-tight">
+          Subjects
+        </h2>
+        <p class="text-sm text-muted">
+          The student only sees the subjects ticked here — including mock papers and discussion activities.
+        </p>
+      </div>
+
+      <p
+        v-if="!subjectItems.length"
+        class="text-sm text-muted"
+      >
+        No subjects yet.
+      </p>
+      <UCheckboxGroup
+        v-else
+        v-model="selectedSubjectIds"
+        :items="subjectItems"
+        value-key="subjectId"
+      />
+
+      <div class="flex items-center gap-3">
+        <UButton
+          label="Save subjects"
+          :disabled="!subjectsDirty"
+          :loading="savingSubjects"
+          @click="saveSubjects"
+        />
+        <p
+          v-if="subjectsMessage"
+          class="text-sm text-success"
+        >
+          {{ subjectsMessage }}
+        </p>
+        <p
+          v-if="subjectsError"
+          class="text-sm text-error"
+        >
+          {{ subjectsError }}
+        </p>
+      </div>
     </div>
 
     <div class="space-y-3">

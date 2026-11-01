@@ -4,6 +4,15 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 
 const emit = defineEmits<{ saved: [] }>()
 
+interface Subject { id: number, name: string, isActive: boolean }
+const { data: subjects } = await useFetch<Subject[]>('/api/admin/subjects')
+const subjectItems = computed(() => (subjects.value ?? []).map(s => ({
+  subjectId: s.id,
+  label: s.name,
+  description: s.isActive ? undefined : 'Inactive'
+})))
+const subjectIds = ref<number[]>([])
+
 const schema = z.object({
   username: z.string().min(3, 'At least 3 characters').max(50).regex(/^[a-zA-Z0-9_.-]+$/, 'Letters, numbers, dots, dashes, underscores only'),
   password: z.string().min(8, 'At least 8 characters'),
@@ -20,7 +29,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   saving.value = true
   errorMessage.value = ''
   try {
-    await $fetch('/api/admin/students', { method: 'POST', body: event.data })
+    await $fetch('/api/admin/students', { method: 'POST', body: { ...event.data, subjectIds: subjectIds.value } })
     emit('saved')
   } catch (err) {
     errorMessage.value = apiErrorMessage(err, 'Could not create student')
@@ -67,6 +76,24 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         type="password"
         class="w-full"
         autocomplete="new-password"
+      />
+    </UFormField>
+
+    <UFormField
+      label="Subjects"
+      description="The student will only see these subjects."
+    >
+      <p
+        v-if="!subjectItems.length"
+        class="text-sm text-muted"
+      >
+        No subjects yet.
+      </p>
+      <UCheckboxGroup
+        v-else
+        v-model="subjectIds"
+        :items="subjectItems"
+        value-key="subjectId"
       />
     </UFormField>
 
