@@ -44,7 +44,7 @@ interface SubjectReportRow {
 const route = useRoute()
 const id = route.params.id as string
 
-const { data: student, refresh } = await useFetch<Student>(`/api/admin/students/${id}`)
+const { data: student } = await useFetch<Student>(`/api/admin/students/${id}`)
 const { data: history } = await useFetch<HistoryItem[]>(`/api/admin/students/${id}/history`)
 const { data: slowQuestions } = await useFetch<SlowQuestion[]>(`/api/admin/students/${id}/slow-questions`)
 const { data: report } = await useFetch<SubjectReportRow[]>(`/api/admin/students/${id}/report`)
@@ -53,46 +53,6 @@ function timeLabel(ms: number) {
   const seconds = Math.round(ms / 1000)
   if (seconds < 60) return `${seconds}s`
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-}
-
-const displayName = ref('')
-const newPassword = ref('')
-const saving = ref(false)
-const message = ref('')
-
-watch(student, (s) => {
-  if (s) displayName.value = s.displayName
-}, { immediate: true })
-
-async function saveDetails() {
-  saving.value = true
-  message.value = ''
-  try {
-    await $fetch(`/api/admin/students/${id}`, { method: 'PATCH', body: { displayName: displayName.value } })
-    message.value = 'Saved'
-    await refresh()
-  } finally {
-    saving.value = false
-  }
-}
-
-async function resetPassword() {
-  if (!newPassword.value) return
-  saving.value = true
-  message.value = ''
-  try {
-    await $fetch(`/api/admin/students/${id}`, { method: 'PATCH', body: { password: newPassword.value } })
-    newPassword.value = ''
-    message.value = 'Password updated'
-  } finally {
-    saving.value = false
-  }
-}
-
-async function toggleActive() {
-  if (!student.value) return
-  await $fetch(`/api/admin/students/${id}`, { method: 'PATCH', body: { isActive: !student.value.isActive } })
-  await refresh()
 }
 
 interface Subject { id: number, name: string, isActive: boolean, categoryId: number | null }
@@ -189,60 +149,25 @@ const previewOpen = computed({
     v-if="student"
     class="space-y-8"
   >
-    <div>
-      <p class="text-sm text-muted font-mono">
-        @{{ student.username }}
-      </p>
-      <h1 class="text-2xl font-bold tracking-tight">
-        {{ student.displayName }}
-      </h1>
-    </div>
-
-    <div class="rounded-lg border border-default p-4 space-y-4">
-      <UFormField label="Display name">
-        <div class="flex gap-2">
-          <UInput
-            v-model="displayName"
-            class="w-full"
-          />
-          <UButton
-            label="Save"
-            :loading="saving"
-            @click="saveDetails"
-          />
-        </div>
-      </UFormField>
-
-      <UFormField label="Reset password">
-        <div class="flex gap-2">
-          <UInput
-            v-model="newPassword"
-            type="password"
-            placeholder="New password"
-            class="w-full"
-          />
-          <UButton
-            label="Set"
-            :disabled="!newPassword"
-            :loading="saving"
-            @click="resetPassword"
-          />
-        </div>
-      </UFormField>
-
-      <p
-        v-if="message"
-        class="text-sm text-success"
-      >
-        {{ message }}
-      </p>
-
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <p class="text-sm text-muted font-mono">
+          @{{ student.username }}
+        </p>
+        <h1 class="text-2xl font-bold tracking-tight">
+          {{ student.displayName }}
+          <span
+            v-if="!student.isActive"
+            class="text-sm font-normal text-muted font-mono"
+          >(inactive)</span>
+        </h1>
+      </div>
       <UButton
-        :label="student.isActive ? 'Deactivate account' : 'Activate account'"
+        label="Settings"
+        icon="i-lucide-settings"
         variant="subtle"
         color="neutral"
-        size="sm"
-        @click="toggleActive"
+        :to="`/admin/students/${id}/settings`"
       />
     </div>
 
