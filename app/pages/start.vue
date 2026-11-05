@@ -26,6 +26,21 @@ const treeNodes = computed(() => {
     subjectIds: uncategorized.map(s => s.id)
   }]
 })
+// One category open per level, remembered in a cookie so the student comes back to the same
+// place. No cookie yet → the first category along the first branch is open.
+const openCookie = useCookie<string[] | null>('start-open-categories', {
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: 'lax',
+  default: () => null
+})
+const openCategoryKeys = computed<string[]>({
+  get: () => openCookie.value ?? firstBranchKeys(treeNodes.value),
+  set: (keys) => {
+    openCookie.value = keys
+  }
+})
+provide(START_OPEN_CATEGORIES_KEY, openCategoryKeys)
+
 const { data: currentSession, refresh: refreshCurrentSession } = await useFetch<CurrentSession | null>('/api/sessions/current')
 const abandoning = ref(false)
 const choices = reactive<Record<number, SubjectChoice | undefined>>({})
@@ -134,7 +149,6 @@ async function startSession() {
       <StudentCategoryAccordion
         v-if="treeNodes.length"
         :nodes="treeNodes"
-        open-first
       />
       <div
         v-else

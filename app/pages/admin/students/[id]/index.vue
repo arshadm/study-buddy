@@ -60,21 +60,8 @@ const { data: allSubjects } = await useFetch<Subject[]>('/api/admin/subjects')
 const { data: categoryRows } = await useFetch<CategoryRow[]>('/api/admin/categories')
 const { data: assigned } = await useFetch<{ subjectIds: number[] }>(`/api/admin/students/${id}/subjects`)
 
-// Two levels: each category (named by its full path, in tree order) with the subjects filed
-// directly under it, then "Uncategorised" for subjects with no (or a deleted) category.
-interface SubjectGroup { key: string, name: string, subjects: Subject[] }
-const subjectGroups = computed<SubjectGroup[]>(() => {
-  const rows = categoryRows.value ?? []
-  const subjects = allSubjects.value ?? []
-  const labels = categoryPathLabels(rows)
-  const groups = flattenCategoryTree(buildCategoryTree(rows))
-    .map(c => ({ key: `category-${c.id}`, name: labels.get(c.id) ?? c.name, subjects: subjects.filter(s => s.categoryId === c.id) }))
-    .filter(g => g.subjects.length > 0)
-  const known = new Set(rows.map(r => r.id))
-  const uncategorised = subjects.filter(s => s.categoryId === null || !known.has(s.categoryId))
-  if (uncategorised.length) groups.push({ key: 'uncategorised', name: 'Uncategorised', subjects: uncategorised })
-  return groups
-})
+type SubjectGroup = SubjectCategoryGroup<Subject>
+const subjectGroups = computed(() => groupSubjectsByCategory(categoryRows.value ?? [], allSubjects.value ?? []))
 
 const selectedSubjectIds = ref<number[]>([])
 

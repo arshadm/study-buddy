@@ -1,18 +1,24 @@
 <script setup lang="ts">
-// One level of the start page's category tree; recurses for sub-categories. Only the first
-// entry along the first branch starts open (openFirst is passed down to the first child only),
-// so the student lands with the first category's subjects already visible.
+// One level of the start page's category tree; recurses for sub-categories. One category is
+// open at a time per level; which one comes from the page's shared (cookie-backed) open keys.
 const props = defineProps<{
   nodes: SubjectTreeNode<StartSubject>[]
-  openFirst?: boolean
   // Nested levels use a lighter style so the hierarchy reads at a glance.
   nested?: boolean
 }>()
 
 const { choices } = inject(SUBJECT_CHOICES_KEY)!
+const openKeys = inject(START_OPEN_CATEGORIES_KEY)!
 
 const items = computed(() => props.nodes.map(n => ({ label: n.name, value: n.key, node: n })))
-const openKeys = ref<string[]>(props.openFirst && props.nodes[0] ? [props.nodes[0].key] : [])
+const openKey = computed<string | undefined>({
+  get: () => props.nodes.find(n => openKeys.value.includes(n.key))?.key,
+  // Replaces only this level's entry, so the open category in other levels is kept.
+  set: (key) => {
+    const here = new Set(props.nodes.map(n => n.key))
+    openKeys.value = [...openKeys.value.filter(k => !here.has(k)), ...(key ? [key] : [])]
+  }
+})
 
 function selectedCount(node: SubjectTreeNode<StartSubject>) {
   return node.subjectIds.filter(id => choices[id]).length
@@ -21,8 +27,7 @@ function selectedCount(node: SubjectTreeNode<StartSubject>) {
 
 <template>
   <UAccordion
-    v-model="openKeys"
-    type="multiple"
+    v-model="openKey"
     :items="items"
     :class="nested ? '' : 'rounded-lg border border-default px-4'"
     :ui="nested
@@ -51,7 +56,7 @@ function selectedCount(node: SubjectTreeNode<StartSubject>) {
       />
     </template>
 
-    <template #body="{ item, index }">
+    <template #body="{ item }">
       <div class="space-y-3">
         <div
           v-if="item.node.subjects.length"
@@ -70,7 +75,6 @@ function selectedCount(node: SubjectTreeNode<StartSubject>) {
         >
           <CategoryAccordion
             :nodes="item.node.children"
-            :open-first="openFirst && index === 0"
             nested
           />
         </div>

@@ -113,3 +113,38 @@ export function buildSubjectTree<S extends { id: number, categoryId: number | nu
 
   return { nodes: convert(tree), uncategorized }
 }
+
+// --- Admin lists: subjects grouped one level deep by category ---
+
+export interface SubjectCategoryGroup<S> {
+  key: string
+  // Full category path ("A Levels › Maths"), or "Uncategorised".
+  name: string
+  subjects: S[]
+}
+
+// Each category (in tree order) with the subjects filed directly under it, skipping empty ones,
+// then "Uncategorised" for subjects with no category or one that no longer exists.
+export function groupSubjectsByCategory<S extends { categoryId: number | null }>(
+  categoryRows: CategoryRow[],
+  subjects: S[]
+): SubjectCategoryGroup<S>[] {
+  const labels = categoryPathLabels(categoryRows)
+  const groups = flattenCategoryTree(buildCategoryTree(categoryRows))
+    .map(c => ({ key: `category-${c.id}`, name: labels.get(c.id) ?? c.name, subjects: subjects.filter(s => s.categoryId === c.id) }))
+    .filter(g => g.subjects.length > 0)
+  const known = new Set(categoryRows.map(r => r.id))
+  const uncategorised = subjects.filter(s => s.categoryId === null || !known.has(s.categoryId))
+  if (uncategorised.length) groups.push({ key: 'uncategorised', name: 'Uncategorised', subjects: uncategorised })
+  return groups
+}
+
+// Start page: the keys of the open category at each level of the tree (one per level), provided
+// by the page and shared by every nested CategoryAccordion. Remembered in a cookie.
+export const START_OPEN_CATEGORIES_KEY = Symbol('start-open-categories') as InjectionKey<Ref<string[]>>
+
+// Before anything is remembered: the first category, and the first along its first branch.
+export function firstBranchKeys<S>(nodes: SubjectTreeNode<S>[]): string[] {
+  const first = nodes[0]
+  return first ? [first.key, ...firstBranchKeys(first.children)] : []
+}
