@@ -164,6 +164,13 @@ async function saveSubjects() {
   }
 }
 
+// Subjects starts closed (it's long and rarely changed); History and Report start open.
+const sectionItems = [
+  { value: 'subjects', label: 'Subjects' },
+  { value: 'history', label: 'History' },
+  { value: 'report', label: 'Report — weakest first' }
+]
+
 function dateLabel(ms: number) {
   return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -239,109 +246,116 @@ const previewOpen = computed({
       />
     </div>
 
-    <div class="rounded-lg border border-default p-4 space-y-4">
-      <div>
-        <h2 class="text-lg font-bold tracking-tight">
-          Subjects
-        </h2>
-        <p class="text-sm text-muted">
-          The student only sees the subjects ticked here — including mock papers and discussion activities.
-        </p>
-      </div>
-
-      <p
-        v-if="!subjectGroups.length"
-        class="text-sm text-muted"
-      >
-        No subjects yet.
-      </p>
-      <div
-        v-else
-        class="space-y-4"
-      >
+    <UAccordion
+      type="multiple"
+      :items="sectionItems"
+      :default-value="['history', 'report']"
+      :ui="{ trigger: 'py-4', label: 'text-lg font-bold tracking-tight', body: 'pb-6' }"
+    >
+      <template #body="{ item: section }">
         <div
-          v-for="group in subjectGroups"
-          :key="group.key"
-          class="space-y-2"
+          v-if="section.value === 'subjects'"
+          class="space-y-4"
         >
-          <div class="flex items-center gap-2">
-            <UCheckbox
-              :model-value="groupState(group)"
-              :label="group.name"
-              :ui="{ label: 'font-semibold' }"
-              @update:model-value="setGroup(group, $event)"
-            />
-            <span class="text-xs text-muted font-mono">{{ selectedInGroup(group) }}/{{ group.subjects.length }}</span>
-          </div>
-          <div class="ml-2 space-y-2 border-l border-default pl-4">
-            <UCheckbox
-              v-for="subject in group.subjects"
-              :key="subject.id"
-              :model-value="selectedSubjectIds.includes(subject.id)"
-              :label="subject.name"
-              :description="subject.isActive ? undefined : 'Inactive'"
-              @update:model-value="setSubject(subject.id, $event)"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <UButton
-          label="Save subjects"
-          :disabled="!subjectsDirty"
-          :loading="savingSubjects"
-          @click="saveSubjects"
-        />
-        <p
-          v-if="subjectsMessage"
-          class="text-sm text-success"
-        >
-          {{ subjectsMessage }}
-        </p>
-        <p
-          v-if="subjectsError"
-          class="text-sm text-error"
-        >
-          {{ subjectsError }}
-        </p>
-      </div>
-    </div>
-
-    <div class="space-y-3">
-      <h2 class="text-lg font-bold tracking-tight">
-        History
-      </h2>
-      <p
-        v-if="!history?.length"
-        class="text-muted text-sm"
-      >
-        No completed sessions yet.
-      </p>
-      <NuxtLink
-        v-for="item in history"
-        :key="item.id"
-        :to="`/admin/students/${id}/sessions/${item.id}`"
-        class="rounded-lg border border-default p-4 flex items-center justify-between hover:border-muted transition-colors"
-      >
-        <div>
-          <p class="font-medium">
-            {{ item.subjects.map(s => s.subjectName).join(', ') }}
-          </p>
           <p class="text-sm text-muted">
-            {{ dateLabel(item.startedAt) }}
+            The student only sees the subjects ticked here — including mock papers and discussion activities.
           </p>
-        </div>
-        <p class="font-mono font-semibold">
-          {{ formatScore(item.scoreCorrect) }} / {{ item.scoreTotal }}
-        </p>
-      </NuxtLink>
-    </div>
 
-    <ReportBreakdown
-      :report="report"
-      title="Report — weakest first"
-    />
+          <p
+            v-if="!subjectGroups.length"
+            class="text-sm text-muted"
+          >
+            No subjects yet.
+          </p>
+          <div
+            v-else
+            class="space-y-4"
+          >
+            <div
+              v-for="group in subjectGroups"
+              :key="group.key"
+              class="space-y-2"
+            >
+              <div class="flex items-center gap-2">
+                <UCheckbox
+                  :model-value="groupState(group)"
+                  :label="group.name"
+                  :ui="{ label: 'font-semibold' }"
+                  @update:model-value="setGroup(group, $event)"
+                />
+                <span class="text-xs text-muted font-mono">{{ selectedInGroup(group) }}/{{ group.subjects.length }}</span>
+              </div>
+              <div class="ml-2 space-y-2 border-l border-default pl-4">
+                <UCheckbox
+                  v-for="subject in group.subjects"
+                  :key="subject.id"
+                  :model-value="selectedSubjectIds.includes(subject.id)"
+                  :label="subject.name"
+                  :description="subject.isActive ? undefined : 'Inactive'"
+                  @update:model-value="setSubject(subject.id, $event)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <UButton
+              label="Save subjects"
+              :disabled="!subjectsDirty"
+              :loading="savingSubjects"
+              @click="saveSubjects"
+            />
+            <p
+              v-if="subjectsMessage"
+              class="text-sm text-success"
+            >
+              {{ subjectsMessage }}
+            </p>
+            <p
+              v-if="subjectsError"
+              class="text-sm text-error"
+            >
+              {{ subjectsError }}
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-else-if="section.value === 'history'"
+          class="space-y-3"
+        >
+          <p
+            v-if="!history?.length"
+            class="text-muted text-sm"
+          >
+            No completed sessions yet.
+          </p>
+          <NuxtLink
+            v-for="item in history"
+            :key="item.id"
+            :to="`/admin/students/${id}/sessions/${item.id}`"
+            class="rounded-lg border border-default p-4 flex items-center justify-between hover:border-muted transition-colors"
+          >
+            <div>
+              <p class="font-medium">
+                {{ item.subjects.map(s => s.subjectName).join(', ') }}
+              </p>
+              <p class="text-sm text-muted">
+                {{ dateLabel(item.startedAt) }}
+              </p>
+            </div>
+            <p class="font-mono font-semibold">
+              {{ formatScore(item.scoreCorrect) }} / {{ item.scoreTotal }}
+            </p>
+          </NuxtLink>
+        </div>
+
+        <ReportBreakdown
+          v-else-if="section.value === 'report'"
+          :report="report"
+        />
+      </template>
+    </UAccordion>
 
     <div
       v-if="slowQuestions?.length"

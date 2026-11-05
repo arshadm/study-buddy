@@ -17,7 +17,8 @@ interface SubjectReportRow {
 
 const props = withDefaults(defineProps<{
   report: SubjectReportRow[] | null | undefined
-  title: string
+  // Omit when the surrounding page already labels the section (e.g. an accordion header).
+  title?: string
   emptyMessage?: string
   notAttemptedHeading?: string
 }>(), {
@@ -40,7 +41,10 @@ function accuracyColorClass(percent: number): string {
 
 <template>
   <div class="space-y-3">
-    <h2 class="text-lg font-bold tracking-tight">
+    <h2
+      v-if="title"
+      class="text-lg font-bold tracking-tight"
+    >
       {{ title }}
     </h2>
     <p
