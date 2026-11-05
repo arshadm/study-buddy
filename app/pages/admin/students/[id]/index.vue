@@ -95,15 +95,47 @@ async function toggleActive() {
   await refresh()
 }
 
-interface Subject { id: number, name: string, isActive: boolean }
+interface Subject { id: number, name: string, isActive: boolean, categoryId: number | null }
 const { data: allSubjects } = await useFetch<Subject[]>('/api/admin/subjects')
+const { data: categoryRows } = await useFetch<CategoryRow[]>('/api/admin/categories')
 const { data: assigned } = await useFetch<{ subjectIds: number[] }>(`/api/admin/students/${id}/subjects`)
-const subjectItems = computed(() => (allSubjects.value ?? []).map(s => ({
-  subjectId: s.id,
-  label: s.name,
-  description: s.isActive ? undefined : 'Inactive'
-})))
+
+// Two levels: each category (named by its full path, in tree order) with the subjects filed
+// directly under it, then "Uncategorised" for subjects with no (or a deleted) category.
+interface SubjectGroup { key: string, name: string, subjects: Subject[] }
+const subjectGroups = computed<SubjectGroup[]>(() => {
+  const rows = categoryRows.value ?? []
+  const subjects = allSubjects.value ?? []
+  const labels = categoryPathLabels(rows)
+  const groups = flattenCategoryTree(buildCategoryTree(rows))
+    .map(c => ({ key: `category-${c.id}`, name: labels.get(c.id) ?? c.name, subjects: subjects.filter(s => s.categoryId === c.id) }))
+    .filter(g => g.subjects.length > 0)
+  const known = new Set(rows.map(r => r.id))
+  const uncategorised = subjects.filter(s => s.categoryId === null || !known.has(s.categoryId))
+  if (uncategorised.length) groups.push({ key: 'uncategorised', name: 'Uncategorised', subjects: uncategorised })
+  return groups
+})
+
 const selectedSubjectIds = ref<number[]>([])
+
+function selectedInGroup(group: SubjectGroup) {
+  return group.subjects.filter(s => selectedSubjectIds.value.includes(s.id)).length
+}
+function groupState(group: SubjectGroup): boolean | 'indeterminate' {
+  const n = selectedInGroup(group)
+  return n === 0 ? false : n === group.subjects.length ? true : 'indeterminate'
+}
+function setGroup(group: SubjectGroup, on: boolean | 'indeterminate') {
+  const ids = group.subjects.map(s => s.id)
+  selectedSubjectIds.value = on === true
+    ? [...new Set([...selectedSubjectIds.value, ...ids])]
+    : selectedSubjectIds.value.filter(sid => !ids.includes(sid))
+}
+function setSubject(subjectId: number, on: boolean | 'indeterminate') {
+  selectedSubjectIds.value = on === true
+    ? [...new Set([...selectedSubjectIds.value, subjectId])]
+    : selectedSubjectIds.value.filter(sid => sid !== subjectId)
+}
 watch(assigned, (a) => {
   if (a) selectedSubjectIds.value = [...a.subjectIds]
 }, { immediate: true })
@@ -218,17 +250,41 @@ const previewOpen = computed({
       </div>
 
       <p
-        v-if="!subjectItems.length"
+        v-if="!subjectGroups.length"
         class="text-sm text-muted"
       >
         No subjects yet.
       </p>
-      <UCheckboxGroup
+      <div
         v-else
-        v-model="selectedSubjectIds"
-        :items="subjectItems"
-        value-key="subjectId"
-      />
+        class="space-y-4"
+      >
+        <div
+          v-for="group in subjectGroups"
+          :key="group.key"
+          class="space-y-2"
+        >
+          <div class="flex items-center gap-2">
+            <UCheckbox
+              :model-value="groupState(group)"
+              :label="group.name"
+              :ui="{ label: 'font-semibold' }"
+              @update:model-value="setGroup(group, $event)"
+            />
+            <span class="text-xs text-muted font-mono">{{ selectedInGroup(group) }}/{{ group.subjects.length }}</span>
+          </div>
+          <div class="ml-2 space-y-2 border-l border-default pl-4">
+            <UCheckbox
+              v-for="subject in group.subjects"
+              :key="subject.id"
+              :model-value="selectedSubjectIds.includes(subject.id)"
+              :label="subject.name"
+              :description="subject.isActive ? undefined : 'Inactive'"
+              @update:model-value="setSubject(subject.id, $event)"
+            />
+          </div>
+        </div>
+      </div>
 
       <div class="flex items-center gap-3">
         <UButton
