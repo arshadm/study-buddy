@@ -46,6 +46,18 @@ function onQuestionCountInput(value: number | null) {
 // instead of stacking down a narrow card.
 const wide = computed(() => Boolean(choice.value && tagFilter.value?.tags.length))
 
+function tagTitle(tag: SubjectTagOption) {
+  return tag.score === null
+    ? `${tag.name}: not tried yet`
+    : `${tag.name}: ${tag.score}% correct over ${Math.round(tag.attempts)} attempt${Math.round(tag.attempts) === 1 ? '' : 's'}`
+}
+
+// Legend shows only the bands present on this card.
+const bandsShown = computed(() => {
+  const present = new Set((tagFilter.value?.tags ?? []).map(t => tagBand(t.score)))
+  return (['weak', 'fair', 'strong', 'untried'] as const).filter(b => present.has(b))
+})
+
 function toggleTag(tagId: number) {
   const c = choice.value
   if (!c) return
@@ -148,20 +160,41 @@ function toggleTag(tagId: number) {
             v-for="tag in tagFilter.tags"
             :key="tag.id"
             type="button"
-            class="rounded-full border px-3 py-1 text-xs whitespace-nowrap transition-colors"
+            class="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs whitespace-nowrap transition-colors"
             :class="choice.tagIds.includes(tag.id)
-              ? 'border-primary bg-primary text-inverted'
-              : 'border-default bg-default text-default hover:border-primary/60'"
+              ? TAG_BAND_CLASSES[tagBand(tag.score)].selected
+              : [TAG_BAND_CLASSES[tagBand(tag.score)].idle, 'text-default']"
+            :title="tagTitle(tag)"
             :aria-pressed="choice.tagIds.includes(tag.id)"
             @click="toggleTag(tag.id)"
           >
+            <UIcon
+              v-if="choice.tagIds.includes(tag.id)"
+              name="i-lucide-check"
+              class="size-3.5 -ml-0.5"
+            />
             {{ tag.name }} ({{ tag.questionIds.length }})
           </button>
         </div>
-        <p class="text-xs text-muted">
-          <span class="font-mono text-default">{{ matching }}</span>
-          matching question{{ matching === 1 ? '' : 's' }}
-        </p>
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted">
+          <p>
+            <span class="font-mono text-default">{{ matching }}</span>
+            matching question{{ matching === 1 ? '' : 's' }}
+          </p>
+          <div class="flex flex-wrap gap-x-3 gap-y-1">
+            <span
+              v-for="band in bandsShown"
+              :key="band"
+              class="inline-flex items-center gap-1"
+            >
+              <span
+                class="size-2 rounded-full"
+                :class="TAG_BAND_CLASSES[band].dot"
+              />
+              {{ TAG_BAND_CLASSES[band].label }}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   </div>

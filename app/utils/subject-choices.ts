@@ -16,6 +16,26 @@ export interface SubjectTagOption {
   id: number
   name: string
   questionIds: number[]
+  // The student's percent correct over this tag's questions; null = not tried yet.
+  score: number | null
+  attempts: number
+}
+
+export type TagBand = 'weak' | 'fair' | 'strong' | 'untried'
+
+export function tagBand(score: number | null): TagBand {
+  if (score === null) return 'untried'
+  if (score < 50) return 'weak'
+  if (score < 75) return 'fair'
+  return 'strong'
+}
+
+// Full class strings (not built dynamically) so Tailwind keeps them.
+export const TAG_BAND_CLASSES: Record<TagBand, { idle: string, selected: string, dot: string, label: string }> = {
+  weak: { idle: 'border-error/50 bg-error/10 hover:bg-error/20', selected: 'border-error bg-error text-inverted', dot: 'bg-error', label: 'Needs work (under 50%)' },
+  fair: { idle: 'border-warning/50 bg-warning/10 hover:bg-warning/20', selected: 'border-warning bg-warning text-inverted', dot: 'bg-warning', label: 'Getting there (50–74%)' },
+  strong: { idle: 'border-success/50 bg-success/10 hover:bg-success/20', selected: 'border-success bg-success text-inverted', dot: 'bg-success', label: 'Strong (75%+)' },
+  untried: { idle: 'border-default bg-default hover:bg-elevated', selected: 'border-inverted bg-inverted text-inverted', dot: 'bg-accented', label: 'Not tried yet' }
 }
 
 export interface SubjectTagFilter {

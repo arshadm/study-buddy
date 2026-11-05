@@ -91,7 +91,7 @@ export async function createSessionForAllocations(studentId: number, allocations
       allocation.subjectId,
       Math.min(allocation.questionCount, activeQuestions.length),
       expectedTimePerQuestionMs,
-      tagIds.length > 0 ? new Set(activeQuestions) : undefined
+      tagIds
     )
 
     for (const questionId of pickedIds) {

@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { db } from '../database/client'
-import { documents, questions, quizSessionQuestions, quizSessions, sections } from '../database/schema'
+import { documents, questions, questionTags, quizSessionQuestions, quizSessions, sections, subjectTags } from '../database/schema'
 import { effectivePercentSql } from './scoring'
 
 const EFFECTIVE_PERCENT = effectivePercentSql('ssq.')
@@ -13,15 +13,18 @@ const SLOWNESS_THRESHOLD_MULTIPLIER = 1.3
 const SLOWNESS_FACTOR = 1.25
 const UNSEEN_BOOST = 1.2
 const DIFFICULTY_DISTANCE_PENALTY = 0.25
-// Section-level equivalent of WRONG_ATTEMPT_WEIGHT, used when picking which section a question
-// comes from (see pickWeightedQuestionsForSubject) — same shape as the per-question factor,
-// applied one level up so a section's share of picks reflects weakness, not pool size.
-const SECTION_WRONG_WEIGHT = 1.5
 
-// Groups questions with no sectionId into one pseudo-section so they still compete for
-// selection instead of being excluded from the section-first pick.
-const UNSECTIONED_KEY = 'unsectioned'
-type SectionKey = number | typeof UNSECTIONED_KEY
+// Tag-level weakness (see computeTagWeight). Unlike the per-question factor this uses the
+// *proportion* answered wrong, not the count, so a broad tag on many questions doesn't win picks
+// just by having more attempts. TAG_PRIOR_* smooth the rate toward 50% until a tag has a few
+// attempts, so one lucky/unlucky answer doesn't dominate.
+const TAG_WRONG_RATE_WEIGHT = 3
+const TAG_PRIOR_WRONG = 0.5
+const TAG_PRIOR_SEEN = 1
+
+// Questions with no tags compete as one pseudo-tag when no tag filter is applied.
+const UNTAGGED_KEY = 'untagged'
+type TagKey = number | typeof UNTAGGED_KEY
 
 interface QuestionStatsRow {
   questionId: number
@@ -131,22 +134,70 @@ export function computeWeight(stats: QuestionStatsRow, expectedTimePerQuestionMs
   return wrongFactor * recencyBoost * slownessFactor * unseenBoost * difficultyFactor
 }
 
-// Weakness score for a section (or the unsectioned pseudo-section), aggregated from its
-// questions' stats. Deliberately mirrors only the wrong-rate/recency/unseen shape of
-// computeWeight — slowness and difficulty-distance are inherently per-question signals that
-// don't aggregate meaningfully to section granularity.
-function computeSectionWeight(timesSeen: number, timesWrong: number, lastSeenAt: number | null): number {
-  const wrongFactor = 1 + timesWrong * SECTION_WRONG_WEIGHT
+// Weakness weight for a tag (or the untagged pseudo-tag), from the stats of its questions —
+// full credit: a question carrying several tags counts in full towards each.
+function computeTagWeight(agg: TagAggregate): number {
+  const wrongRate = (agg.timesWrong + TAG_PRIOR_WRONG) / (agg.timesSeen + TAG_PRIOR_SEEN)
+  const wrongFactor = 1 + wrongRate * TAG_WRONG_RATE_WEIGHT
 
   let recencyBoost = 1.0
-  if (lastSeenAt !== null) {
-    const daysSince = (Date.now() - lastSeenAt) / (1000 * 60 * 60 * 24)
+  if (agg.lastSeenAt !== null) {
+    const daysSince = (Date.now() - agg.lastSeenAt) / (1000 * 60 * 60 * 24)
     recencyBoost = 1 + Math.max(0, 1 - daysSince / RECENCY_WINDOW_DAYS) * RECENCY_MAX_BOOST
   }
 
-  const unseenBoost = timesSeen === 0 ? UNSEEN_BOOST : 1.0
+  const unseenBoost = agg.timesSeen === 0 ? UNSEEN_BOOST : 1.0
 
   return wrongFactor * recencyBoost * unseenBoost
+}
+
+export interface TagAggregate {
+  timesSeen: number
+  timesWrong: number
+  lastSeenAt: number | null
+}
+
+function aggregate(rows: QuestionStatsRow[]): TagAggregate {
+  return {
+    timesSeen: rows.reduce((sum, s) => sum + s.timesSeen, 0),
+    timesWrong: rows.reduce((sum, s) => sum + s.timesWrong, 0),
+    lastSeenAt: rows.reduce<number | null>(
+      (latest, s) => (s.lastSeenAt === null ? latest : latest === null ? s.lastSeenAt : Math.max(latest, s.lastSeenAt)),
+      null
+    )
+  }
+}
+
+// tag id -> question ids, for this subject's tags.
+function getQuestionTagMap(subjectId: number): Map<number, number[]> {
+  const rows = db.all<{ tag_id: number, question_id: number }>(sql`
+    SELECT qt.tag_id AS tag_id, qt.question_id AS question_id
+    FROM ${questionTags} qt
+    INNER JOIN ${subjectTags} t ON t.id = qt.tag_id
+    WHERE t.subject_id = ${subjectId}
+  `)
+  const byTag = new Map<number, number[]>()
+  for (const r of rows) {
+    const list = byTag.get(r.tag_id)
+    if (list) list.push(r.question_id)
+    else byTag.set(r.tag_id, [r.question_id])
+  }
+  return byTag
+}
+
+// The student's record per tag over the subject's available questions (start page colours).
+// score = percent correct (fractional credit for self-marks); null when never attempted.
+export function getTagScores(studentId: number, subjectId: number): Map<number, { score: number | null, attempts: number }> {
+  const statsById = new Map(getQuestionStats(studentId, subjectId).map(s => [s.questionId, s]))
+  const result = new Map<number, { score: number | null, attempts: number }>()
+  for (const [tagId, questionIds] of getQuestionTagMap(subjectId)) {
+    const agg = aggregate(questionIds.map(id => statsById.get(id)).filter((s): s is QuestionStatsRow => s !== undefined))
+    result.set(tagId, {
+      score: agg.timesSeen > 0 ? Math.round(100 * (1 - agg.timesWrong / agg.timesSeen)) : null,
+      attempts: agg.timesSeen
+    })
+  }
+  return result
 }
 
 // Picks a random index from `weights`, proportional to each entry's share of the total.
@@ -174,54 +225,55 @@ export function weightedSampleWithoutReplacement(items: WeightedQuestion[], n: n
   return picked
 }
 
-// Picks `count` questions for a subject in two steps per pick: first a section, weighted by how
-// weak the student is in it (see computeSectionWeight), then a question within that section,
-// weighted by its own factor (see computeWeight). This keeps a section's share of picks
-// proportional to its weakness rather than to how many questions it happens to contain — a
-// section with 50 questions no longer crowds out a weaker section with only 5.
+// Picks `count` questions for a subject in two steps per pick: first a tag, weighted by how weak
+// the student is in it (see computeTagWeight), then a question carrying that tag, weighted by its
+// own factor (see computeWeight). A tag's share of picks therefore reflects weakness rather than
+// how many questions it has.
 //
-// `allowedQuestionIds` (the start page's tag filter) restricts which questions can be picked.
-// Target difficulty is still computed from the whole subject, so a narrow tag filter doesn't
-// skew it.
-export function pickWeightedQuestionsForSubject(studentId: number, subjectId: number, count: number, expectedTimePerQuestionMs: number, allowedQuestionIds?: Set<number>): number[] {
-  const allStats = getQuestionStats(studentId, subjectId)
-  const targetDifficulty = computeTargetDifficulty(allStats)
-  const stats = allowedQuestionIds ? allStats.filter(s => allowedQuestionIds.has(s.questionId)) : allStats
+// `selectedTagIds` (the start page's filter) limits the competing tags to those — and so the
+// questions to ones carrying at least one of them. With no filter, every tag of the subject
+// competes, plus one pseudo-tag holding the untagged questions. A question with several tags sits
+// in each of their pools and is removed from all of them once picked. Target difficulty is always
+// computed from the whole subject, so a narrow filter doesn't skew it.
+export function pickWeightedQuestionsForSubject(studentId: number, subjectId: number, count: number, expectedTimePerQuestionMs: number, selectedTagIds: number[] = []): number[] {
+  const stats = getQuestionStats(studentId, subjectId)
+  const targetDifficulty = computeTargetDifficulty(stats)
+  const statsById = new Map(stats.map(s => [s.questionId, s]))
+  const questionWeight = new Map(stats.map(s => [s.questionId, computeWeight(s, expectedTimePerQuestionMs, targetDifficulty)]))
 
-  const bySection = new Map<SectionKey, QuestionStatsRow[]>()
-  for (const s of stats) {
-    const key: SectionKey = s.sectionId ?? UNSECTIONED_KEY
-    const group = bySection.get(key)
-    if (group) group.push(s)
-    else bySection.set(key, [s])
+  const tagMap = getQuestionTagMap(subjectId)
+  const groups = new Map<TagKey, number[]>()
+  const wanted = new Set(selectedTagIds)
+  for (const [tagId, questionIds] of tagMap) {
+    if (wanted.size > 0 && !wanted.has(tagId)) continue
+    // Only available questions (getQuestionStats applies the active/published filter).
+    const available = questionIds.filter(id => statsById.has(id))
+    if (available.length > 0) groups.set(tagId, available)
+  }
+  if (wanted.size === 0) {
+    const tagged = new Set([...tagMap.values()].flat())
+    const untagged = stats.filter(s => !tagged.has(s.questionId)).map(s => s.questionId)
+    if (untagged.length > 0) groups.set(UNTAGGED_KEY, untagged)
   }
 
-  interface SectionPool { weight: number, questions: WeightedQuestion[] }
-
-  const sectionPool: SectionPool[] = [...bySection.values()].map((group) => {
-    const timesSeen = group.reduce((sum, s) => sum + s.timesSeen, 0)
-    const timesWrong = group.reduce((sum, s) => sum + s.timesWrong, 0)
-    const lastSeenAt = group.reduce<number | null>(
-      (latest, s) => (s.lastSeenAt === null ? latest : latest === null ? s.lastSeenAt : Math.max(latest, s.lastSeenAt)),
-      null
-    )
-
-    return {
-      weight: computeSectionWeight(timesSeen, timesWrong, lastSeenAt),
-      questions: group.map(s => ({ id: s.questionId, weight: computeWeight(s, expectedTimePerQuestionMs, targetDifficulty) }))
-    }
-  })
+  interface TagPool { weight: number, questions: Set<number> }
+  const pools: TagPool[] = [...groups.values()].map(ids => ({
+    weight: computeTagWeight(aggregate(ids.map(id => statsById.get(id)!))),
+    questions: new Set(ids)
+  }))
 
   const picked: number[] = []
-  for (let i = 0; i < count && sectionPool.length > 0; i++) {
-    const sectionIdx = weightedRandomIndex(sectionPool.map(sec => sec.weight))
-    const section = sectionPool[sectionIdx]!
+  for (let i = 0; i < count; i++) {
+    for (let p = pools.length - 1; p >= 0; p--) {
+      if (pools[p]!.questions.size === 0) pools.splice(p, 1)
+    }
+    if (pools.length === 0) break
 
-    const questionIdx = weightedRandomIndex(section.questions.map(q => q.weight))
-    picked.push(section.questions[questionIdx]!.id)
-    section.questions.splice(questionIdx, 1)
-
-    if (section.questions.length === 0) sectionPool.splice(sectionIdx, 1)
+    const pool = pools[weightedRandomIndex(pools.map(tp => tp.weight))]!
+    const candidates = [...pool.questions]
+    const questionId = candidates[weightedRandomIndex(candidates.map(id => questionWeight.get(id)!))]!
+    picked.push(questionId)
+    for (const tp of pools) tp.questions.delete(questionId)
   }
 
   return picked
