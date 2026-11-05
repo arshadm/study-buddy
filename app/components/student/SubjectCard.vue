@@ -42,8 +42,8 @@ function onQuestionCountInput(value: number | null) {
   if (choice.value && value !== null) choice.value.questionCount = value
 }
 
-// A selected subject with tags takes the whole grid row, so its pills flow across the page
-// instead of stacking down a narrow card.
+// A selected subject with tags lays its settings and tag pills side by side, so the pills flow
+// across the full-width card instead of stacking under the settings.
 const wide = computed(() => Boolean(choice.value && tagFilter.value?.tags.length))
 
 function tagTitle(tag: SubjectTagOption) {
@@ -68,10 +68,7 @@ function toggleTag(tagId: number) {
 <template>
   <div
     class="rounded-lg border p-4 transition-colors"
-    :class="[
-      choice ? 'border-primary bg-primary/5' : 'border-default hover:border-muted',
-      wide ? 'col-span-full' : ''
-    ]"
+    :class="choice ? 'border-primary bg-primary/5' : 'border-default hover:border-muted'"
   >
     <button
       type="button"
