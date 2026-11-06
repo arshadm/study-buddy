@@ -149,6 +149,19 @@ export const questionTags = sqliteTable('question_tags', {
   index('idx_question_tags_tag').on(table.tagId)
 ])
 
+// Claude's step-by-step solution for a question (server/utils/question-explanations.ts), made the
+// first time any student asks for it and then shared by everyone. One row per question; content is
+// the JSON shape in QuestionExplanation, set once status is 'done'. A 'pending' row older than the
+// generation timeout is treated as abandoned (e.g. a redeploy mid-call) and regenerated.
+export const questionExplanations = sqliteTable('question_explanations', {
+  questionId: integer('question_id').primaryKey().references(() => questions.id, { onDelete: 'cascade' }),
+  status: text('status', { enum: ['pending', 'done', 'failed'] }).notNull(),
+  content: text('content', { mode: 'json' }),
+  error: text('error'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull()
+})
+
 export const questionOptions = sqliteTable('question_options', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   questionId: integer('question_id').notNull().references(() => questions.id, { onDelete: 'cascade' }),

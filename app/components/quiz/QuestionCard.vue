@@ -31,6 +31,8 @@ const props = defineProps<{
   hintUsed: boolean
   flagged: boolean
   saving: boolean
+  // Endpoint for "Explain with Claude" — offered once the student has checked their answer.
+  explanationUrl?: string
 }>()
 
 const emit = defineEmits<{
@@ -200,16 +202,19 @@ function revealHint() {
         @click="revealSolution"
       />
 
-      <UFormField
-        v-else
-        label="How did you do?"
-      >
-        <URadioGroup
-          :model-value="selfMarkRadioValue"
-          :items="SELF_MARK_OPTIONS"
-          @update:model-value="markSelf"
+      <template v-else>
+        <UFormField label="How did you do?">
+          <URadioGroup
+            :model-value="selfMarkRadioValue"
+            :items="SELF_MARK_OPTIONS"
+            @update:model-value="markSelf"
+          />
+        </UFormField>
+        <ClaudeExplanation
+          v-if="explanationUrl"
+          :url="explanationUrl"
         />
-      </UFormField>
+      </template>
     </div>
 
     <div class="flex items-center gap-4">

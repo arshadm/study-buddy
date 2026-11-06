@@ -84,6 +84,7 @@ const timeTakenLabel = computed(() => {
         :key="item.sequenceIndex"
         :item="item"
         :index="item.sequenceIndex"
+        :explanation-url="`/api/sessions/${route.params.id}/questions/${item.sequenceIndex}/explanation`"
       />
     </div>
   </div>

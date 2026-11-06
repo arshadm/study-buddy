@@ -27,6 +27,8 @@ const props = defineProps<{
     submittedAnswerImageUrl: string | null
     options: Option[]
   }
+  // Endpoint for "Explain with Claude"; omitted where it isn't offered.
+  explanationUrl?: string
 }>()
 
 const solutionRevealed = ref(false)
@@ -235,5 +237,10 @@ const timeSpentLabel = computed(() => {
         img-class="w-full max-h-[36rem] object-contain rounded-md bg-white border border-default mt-2"
       />
     </div>
+
+    <ClaudeExplanation
+      v-if="explanationUrl"
+      :url="explanationUrl"
+    />
   </div>
 </template>

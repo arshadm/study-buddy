@@ -63,5 +63,18 @@ async function deleteQuestion() {
       :question="question"
       @saved="onSaved"
     />
+
+    <div class="space-y-2 border-t border-default pt-6">
+      <h2 class="text-lg font-bold tracking-tight">
+        Claude's explanation
+      </h2>
+      <p class="text-sm text-muted">
+        What students see when they press "Explain with Claude". It's made once and shared — regenerate it if it's wrong.
+      </p>
+      <ClaudeExplanation
+        :url="`/api/admin/questions/${route.params.questionId}/explanation`"
+        admin
+      />
+    </div>
   </div>
 </template>

@@ -267,6 +267,7 @@ watch(sessionId, loadOverview)
         :hint-used="currentQuestion.hintUsed"
         :flagged="currentQuestion.flagged"
         :saving="saving"
+        :explanation-url="`/api/sessions/${sessionId}/questions/${currentQuestion.sequenceIndex}/explanation`"
         @answer="handleAnswer"
         @toggle-flag="toggleFlag"
         @upload-answer-image="uploadAnswerImage"

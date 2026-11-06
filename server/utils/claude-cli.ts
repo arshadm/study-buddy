@@ -47,7 +47,7 @@ function isAuthErrorText(text: string) {
   return text.includes('Not logged in') || text.includes('/login')
 }
 
-async function runClaudeCli(args: string[], stdin?: string): Promise<{ stdout: string, exitCode: number }> {
+async function runClaudeCli(args: string[], stdin?: string, timeoutMs = CLI_TIMEOUT_MS): Promise<{ stdout: string, exitCode: number }> {
   return new Promise((resolve, reject) => {
     const child = spawn('claude', args, {
       env: { ...process.env, HOME: getClaudeHomeDir() },
@@ -62,7 +62,7 @@ async function runClaudeCli(args: string[], stdin?: string): Promise<{ stdout: s
       settled = true
       child.kill('SIGKILL')
       reject(new ClaudeGradingError('Claude CLI timed out'))
-    }, CLI_TIMEOUT_MS)
+    }, timeoutMs)
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk
@@ -309,12 +309,10 @@ export function buildSuggestionPrompt(images: SuggestionImage[], tagNames: strin
 }
 
 // Images can't go through a plain-text prompt, and grading runs with every tool disabled (so
-// the CLI can't Read a file path either) — instead the message is sent as a stream-json user turn
-// with inline base64 image blocks. Returns tag names exactly as Claude wrote them; the caller
-// maps them back onto the subject's tag list and drops anything that isn't on it.
-async function runSuggestionOnce(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<QuestionSuggestion> {
-  const text = buildSuggestionPrompt(images, tagNames, subjectName)
-
+// the CLI can't Read a file path either) — instead images and prompt are sent as one stream-json
+// user turn with inline base64 image blocks. Returns the structured JSON result (validated against
+// jsonSchema by the CLI; callers still parse it with zod).
+async function runImagePromptOnce(images: SuggestionImage[], text: string, jsonSchema: string, timeoutMs = CLI_TIMEOUT_MS): Promise<unknown> {
   const message = JSON.stringify({
     type: 'user',
     message: {
@@ -337,8 +335,8 @@ async function runSuggestionOnce(images: SuggestionImage[], tagNames: string[], 
     '--tools', '',
     '--permission-prompts', 'none',
     '--no-session-persistence',
-    '--json-schema', SUGGESTION_SCHEMA
-  ], `${message}\n`)
+    '--json-schema', jsonSchema
+  ], `${message}\n`, timeoutMs)
 
   let resultEvent: { is_error?: boolean, result?: unknown, structured_output?: unknown } | undefined
   for (const line of stdout.split('\n')) {
@@ -361,21 +359,19 @@ async function runSuggestionOnce(images: SuggestionImage[], tagNames: string[], 
     throw new ClaudeGradingError(resultText)
   }
 
-  let parsed: unknown = resultEvent.structured_output
-  if (parsed === undefined) {
-    try {
-      parsed = typeof resultEvent.result === 'string' ? JSON.parse(resultEvent.result) : resultEvent.result
-    } catch {
-      throw new ClaudeGradingError(`Claude did not return valid JSON: ${String(resultEvent.result).slice(0, 500)}`)
-    }
+  if (resultEvent.structured_output !== undefined) return resultEvent.structured_output
+  try {
+    return typeof resultEvent.result === 'string' ? JSON.parse(resultEvent.result) : resultEvent.result
+  } catch {
+    throw new ClaudeGradingError(`Claude did not return valid JSON: ${String(resultEvent.result).slice(0, 500)}`)
   }
-  return suggestionSchema.parse(parsed)
 }
 
-// Same retry/auth-banner policy as gradeAnswer.
-export async function suggestTagsAndDifficulty(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<QuestionSuggestion> {
+// Same retry/auth-banner policy as gradeAnswer: one retry on a generic failure, none on an auth
+// failure (which flips the admin re-auth banner instead).
+async function withRetryAndAuthStatus<T>(run: () => Promise<T>): Promise<T> {
   try {
-    const result = await runSuggestionOnce(images, tagNames, subjectName)
+    const result = await run()
     await recordAuthStatus('ok', null)
     return result
   } catch (err) {
@@ -384,7 +380,7 @@ export async function suggestTagsAndDifficulty(images: SuggestionImage[], tagNam
       throw err
     }
     try {
-      const result = await runSuggestionOnce(images, tagNames, subjectName)
+      const result = await run()
       await recordAuthStatus('ok', null)
       return result
     } catch (retryErr) {
@@ -392,4 +388,91 @@ export async function suggestTagsAndDifficulty(images: SuggestionImage[], tagNam
       throw retryErr
     }
   }
+}
+
+// Tag names come back exactly as Claude wrote them; the caller maps them back onto the subject's
+// tag list and drops anything that isn't on it.
+export async function suggestTagsAndDifficulty(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<QuestionSuggestion> {
+  return withRetryAndAuthStatus(async () =>
+    suggestionSchema.parse(await runImagePromptOnce(images, buildSuggestionPrompt(images, tagNames, subjectName), SUGGESTION_SCHEMA)))
+}
+
+// --- Step-by-step explanations ---
+
+const EXPLANATION_TIMEOUT_MS = 240_000
+
+const explanationSchema = z.object({
+  summary: z.string(),
+  steps: z.array(z.object({
+    title: z.string(),
+    explanation: z.string(),
+    working: z.string().nullable(),
+    marks: z.string().nullable()
+  })).min(1),
+  final_answer: z.string(),
+  common_mistakes: z.array(z.string()),
+  matches_official_answer: z.boolean().nullable()
+})
+
+export type QuestionExplanation = z.infer<typeof explanationSchema>
+
+const EXPLANATION_SCHEMA = JSON.stringify({
+  type: 'object',
+  properties: {
+    summary: { type: 'string' },
+    steps: {
+      type: 'array',
+      minItems: 1,
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          explanation: { type: 'string' },
+          working: { type: ['string', 'null'] },
+          marks: { type: ['string', 'null'] }
+        },
+        required: ['title', 'explanation', 'working', 'marks'],
+        additionalProperties: false
+      }
+    },
+    final_answer: { type: 'string' },
+    common_mistakes: { type: 'array', items: { type: 'string' } },
+    matches_official_answer: { type: ['boolean', 'null'] }
+  },
+  required: ['summary', 'steps', 'final_answer', 'common_mistakes', 'matches_official_answer'],
+  additionalProperties: false
+})
+
+export function buildExplanationPrompt(images: SuggestionImage[], subjectName: string): string {
+  const hasOfficial = images.some(i => i.label !== 'Question')
+  return [
+    `You are a patient, expert tutor. The first image is a "${subjectName}" exam question${hasOfficial ? `; the others are the official ${images.filter(i => i.label !== 'Question').map(i => i.label.toLowerCase()).join(' and ')}` : ''}.`,
+    'A student has attempted it and now wants a clear, detailed account of how to solve it.',
+    '',
+    '## How to work',
+    '1. Solve the question yourself, carefully, from the question image alone.',
+    hasOfficial
+      ? '2. Then check your working against the official material. If they disagree, find your mistake and follow the official answer; if you are confident the official answer itself is wrong, still present it, and say so in the summary. Set matches_official_answer to whether your independent answer agreed.'
+      : '2. There is no official answer to check against — re-check each step, and set matches_official_answer to null.',
+    '3. Write the explanation for a student at this level: explain *why* each step is taken, not only what is done. Do not skip algebra a student could get stuck on.',
+    '',
+    '## Output',
+    '- summary: 1–2 sentences on what the question tests and the overall approach.',
+    '- steps: one entry per step, in order. For multi-part questions, start each part\'s first step title with the part label, e.g. "(a) Resolve forces".',
+    '  - title: a short heading for the step; any maths in it also goes in $...$.',
+    '  - explanation: the reasoning in plain words, with inline maths in $...$.',
+    '  - working: the key line(s) of working as LaTeX with NO surrounding $ delimiters (it is shown as display maths); use \\\\ between lines or an aligned environment for several lines. null if the step has no working.',
+    hasOfficial
+      ? '  - marks: the mark-scheme credit this step earns (e.g. "M1", "M1 A1", "B1"), if the mark scheme shows it; otherwise null.'
+      : '  - marks: null.',
+    '- final_answer: the final answer(s), with maths in $...$; for several parts, label each one.',
+    '- common_mistakes: 1–3 specific mistakes students make on this question (empty if none worth noting).',
+    '',
+    'Use LaTeX for all mathematics (fractions, powers, vectors, units such as $\\text{m s}^{-2}$). Do not use Markdown, HTML or images.'
+  ].join('\n')
+}
+
+export async function explainQuestion(images: SuggestionImage[], subjectName: string): Promise<QuestionExplanation> {
+  return withRetryAndAuthStatus(async () =>
+    explanationSchema.parse(await runImagePromptOnce(images, buildExplanationPrompt(images, subjectName), EXPLANATION_SCHEMA, EXPLANATION_TIMEOUT_MS)))
 }

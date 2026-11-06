@@ -45,7 +45,7 @@ export async function suggestForImages(subjectId: number, images: SuggestionImag
   return { tagIds: [...new Set(ids)], difficulty: suggestion.difficulty }
 }
 
-async function imagesForQuestion(question: typeof questions.$inferSelect) {
+export async function imagesForQuestion(question: typeof questions.$inferSelect) {
   const images = await Promise.all([
     imageFromStoredPath('Question', question.imagePath),
     imageFromStoredPath('Worked solution', question.workedSolutionImagePath),
