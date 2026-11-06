@@ -248,7 +248,7 @@ export function buildGradingPrompt(ctx: GradingContext): string {
   return parts.join('\n\n')
 }
 
-// --- Tag suggestions from question images ---
+// --- Tag and difficulty suggestions from question images ---
 
 export interface SuggestionImage {
   label: string
@@ -256,26 +256,64 @@ export interface SuggestionImage {
   mediaType: 'image/png' | 'image/jpeg' | 'image/webp'
 }
 
-const TAG_SCHEMA = JSON.stringify({
+const SUGGESTION_SCHEMA = JSON.stringify({
   type: 'object',
-  properties: { tags: { type: 'array', items: { type: 'string' } } },
-  required: ['tags'],
+  properties: {
+    tags: { type: 'array', items: { type: 'string' } },
+    difficulty: { type: 'integer', minimum: 1, maximum: 5 }
+  },
+  required: ['tags', 'difficulty'],
   additionalProperties: false
 })
+
+const suggestionSchema = z.object({
+  tags: z.array(z.string()),
+  difficulty: z.number().int().min(1).max(5)
+})
+
+export interface QuestionSuggestion {
+  tags: string[]
+  difficulty: number
+}
+
+// Anchored scale — without fixed descriptions per level, ratings bunch up around 3. Kept in sync
+// with the 1–5 options in the admin question form.
+const DIFFICULTY_SCALE = [
+  '1 — a single routine step: direct recall, substitution or one standard rule.',
+  '2 — a standard textbook exercise: 2–3 steps with an obvious method.',
+  '3 — multi-step or combines two ideas; the typical mid-paper exam question.',
+  '4 — the method must be chosen, the setting is unfamiliar, or the working is long; late in a paper.',
+  '5 — among the hardest questions in such an exam: proof, genuine insight, or long chains of reasoning across parts.'
+]
+
+export function buildSuggestionPrompt(images: SuggestionImage[], tagNames: string[], subjectName: string): string {
+  return [
+    `These images are from one "${subjectName}" exam question${images.length > 1 ? ` (${images.map(i => i.label).join(', ')})` : ''}.`,
+    '',
+    '## Tags',
+    ...(tagNames.length > 0
+      ? [
+          'Choose the tags that best describe the topics a student must use to answer it — usually 1 to 4.',
+          'Prefer the specific topic actually being tested over broad or merely incidental ones.',
+          'Use ONLY tags from this list, spelled exactly as written. If none fit, return an empty list.',
+          '',
+          ...tagNames.map(t => `- ${t}`)
+        ]
+      : ['This subject has no tag list — return an empty list.']),
+    '',
+    '## Difficulty',
+    `Rate how hard the question is for a student taking "${subjectName}", judged against that level — not against harder or easier qualifications. Use the whole scale:`,
+    ...DIFFICULTY_SCALE.map(l => `- ${l}`),
+    'Use the marks available, the length of the worked solution and mark scheme, and how much of the method the question gives away as evidence. For a multi-part question, rate the question as a whole, leaning towards its hardest part.'
+  ].join('\n')
+}
 
 // Images can't go through a plain-text prompt, and grading runs with every tool disabled (so
 // the CLI can't Read a file path either) — instead the message is sent as a stream-json user turn
 // with inline base64 image blocks. Returns tag names exactly as Claude wrote them; the caller
 // maps them back onto the subject's tag list and drops anything that isn't on it.
-async function runTagSuggestionOnce(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<string[]> {
-  const text = [
-    `These images are from one "${subjectName}" exam question${images.length > 1 ? ` (${images.map(i => i.label).join(', ')})` : ''}.`,
-    'Choose the tags that best describe the topics a student must use to answer it — usually 1 to 4.',
-    'Prefer the specific topic actually being tested over broad or merely incidental ones.',
-    'Use ONLY tags from this list, spelled exactly as written. If none fit, return an empty list.',
-    '',
-    ...tagNames.map(t => `- ${t}`)
-  ].join('\n')
+async function runSuggestionOnce(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<QuestionSuggestion> {
+  const text = buildSuggestionPrompt(images, tagNames, subjectName)
 
   const message = JSON.stringify({
     type: 'user',
@@ -299,7 +337,7 @@ async function runTagSuggestionOnce(images: SuggestionImage[], tagNames: string[
     '--tools', '',
     '--permission-prompts', 'none',
     '--no-session-persistence',
-    '--json-schema', TAG_SCHEMA
+    '--json-schema', SUGGESTION_SCHEMA
   ], `${message}\n`)
 
   let resultEvent: { is_error?: boolean, result?: unknown, structured_output?: unknown } | undefined
@@ -331,13 +369,13 @@ async function runTagSuggestionOnce(images: SuggestionImage[], tagNames: string[
       throw new ClaudeGradingError(`Claude did not return valid JSON: ${String(resultEvent.result).slice(0, 500)}`)
     }
   }
-  return z.object({ tags: z.array(z.string()) }).parse(parsed).tags
+  return suggestionSchema.parse(parsed)
 }
 
 // Same retry/auth-banner policy as gradeAnswer.
-export async function suggestTagNames(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<string[]> {
+export async function suggestTagsAndDifficulty(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<QuestionSuggestion> {
   try {
-    const result = await runTagSuggestionOnce(images, tagNames, subjectName)
+    const result = await runSuggestionOnce(images, tagNames, subjectName)
     await recordAuthStatus('ok', null)
     return result
   } catch (err) {
@@ -346,7 +384,7 @@ export async function suggestTagNames(images: SuggestionImage[], tagNames: strin
       throw err
     }
     try {
-      const result = await runTagSuggestionOnce(images, tagNames, subjectName)
+      const result = await runSuggestionOnce(images, tagNames, subjectName)
       await recordAuthStatus('ok', null)
       return result
     } catch (retryErr) {

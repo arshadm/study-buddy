@@ -120,6 +120,17 @@ export default defineEventHandler(async (event) => {
     tagIdsByRow.set(index, [...ids])
   }
 
+  // Optional `difficulty` column in both import types: 1–5, blank for none.
+  const difficultyByRow = new Map<number, number | null>()
+  function validateDifficulty(row: Record<string, string>, index: number, rowNumber: number) {
+    const raw = row.difficulty?.trim()
+    const value = raw ? Number(raw) : null
+    if (value !== null && (!Number.isInteger(value) || value < 1 || value > 5)) {
+      errors.push(`Row ${rowNumber}: difficulty must be a whole number from 1 to 5`)
+    }
+    difficultyByRow.set(index, value)
+  }
+
   function applyTags(questionId: number, index: number) {
     const ids = tagIdsByRow.get(index) ?? []
     if (ids.length > 0) setQuestionTags(questionId, ids)
@@ -151,6 +162,7 @@ export default defineEventHandler(async (event) => {
 
       validateMarkScheme(row, rowNumber)
       validateTags(row, index, rowNumber)
+      validateDifficulty(row, index, rowNumber)
     })
 
     if (errors.length > 0) {
@@ -181,6 +193,7 @@ export default defineEventHandler(async (event) => {
         type: 'multiple_choice',
         optionFormat: 'image',
         correctAnswerText: row.correct_answer!.trim(),
+        difficulty: difficultyByRow.get(index) ?? null,
         createdAt: now,
         updatedAt: now
       }).returning()
@@ -211,6 +224,7 @@ export default defineEventHandler(async (event) => {
 
       validateMarkScheme(row, rowNumber)
       validateTags(row, index, rowNumber)
+      validateDifficulty(row, index, rowNumber)
     })
 
     if (errors.length > 0) {
@@ -237,6 +251,7 @@ export default defineEventHandler(async (event) => {
         workedSolutionImagePath,
         markSchemeImagePath: await saveMarkScheme(row),
         type: 'self_marked_image',
+        difficulty: difficultyByRow.get(index) ?? null,
         createdAt: now,
         updatedAt: now
       }).returning()
@@ -246,13 +261,15 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Questions that didn't get tags from the CSV are tagged by Claude in the background (only when
-  // the subject has tags to choose from).
+  // Questions the CSV left without tags (when the subject has tags to choose from) or without a
+  // difficulty are filled in by Claude in the background; the worker only fills those gaps.
   let autoTagQueued = 0
-  if (fields.autoTag === 'true' && subjectTagRows.length > 0) {
-    const untagged = createdIds.filter((_, index) => (tagIdsByRow.get(index) ?? []).length === 0)
-    await queueAutoTagging(untagged)
-    autoTagQueued = untagged.length
+  if (fields.autoTag === 'true') {
+    const incomplete = createdIds.filter((_, index) =>
+      (subjectTagRows.length > 0 && (tagIdsByRow.get(index) ?? []).length === 0)
+      || difficultyByRow.get(index) == null)
+    await queueAutoTagging(incomplete)
+    autoTagQueued = incomplete.length
   }
 
   return { imported: createdIds.length, questionIds: createdIds, autoTagQueued }

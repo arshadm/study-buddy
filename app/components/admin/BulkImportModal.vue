@@ -60,7 +60,7 @@ async function submitBulkImport() {
     })
     bulkSuccessMessage.value = `Imported ${result.imported} question${result.imported === 1 ? '' : 's'}.`
       + (result.autoTagQueued
-        ? ` Claude is suggesting tags for ${result.autoTagQueued} of them in the background — progress shows on the section's question list.`
+        ? ` Claude is suggesting tags and difficulty for ${result.autoTagQueued} of them in the background — progress shows on the section's question list.`
         : '')
     bulkFile.value = null
     emit('imported')
@@ -136,7 +136,8 @@ async function submitBulkImport() {
           Optionally add a <code>mark_scheme_image_filename</code> column for a mark scheme image
           per question — leave a row's cell blank when it has none — and a <code>tags</code>
           column of semicolon-separated tag names from this subject's tag list
-          (e.g. <code>Vectors; Proof by induction</code>).
+          (e.g. <code>Vectors; Proof by induction</code>), and a <code>difficulty</code> column
+          of 1 (easiest) to 5 (hardest).
           <template v-if="bulkType === 'self_marked_image'">
             Students see it beside the answer image when they check their work.
           </template>
@@ -147,8 +148,8 @@ async function submitBulkImport() {
 
         <UCheckbox
           v-model="bulkAutoTag"
-          label="Suggest tags with Claude"
-          description="For questions with no tags in the CSV, Claude picks tags from this subject's tag list after the import. Edit them afterwards as needed."
+          label="Suggest tags and difficulty with Claude"
+          description="After the import, Claude fills in whatever the CSV left blank: tags from this subject's tag list, and a 1–5 difficulty. Edit them afterwards as needed."
         />
 
         <input

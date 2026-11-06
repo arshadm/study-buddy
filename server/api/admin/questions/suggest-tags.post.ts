@@ -1,4 +1,4 @@
-// Claude tag suggestions for the question form. Multipart: subjectId (required), plus any
+// Claude tag and difficulty suggestions for the question form. Multipart: subjectId (required), plus any
 // newly-chosen images (image / workedSolutionImage / markSchemeImage). questionId fills in the
 // question's stored images for any slot without a new upload, so editing an existing question
 // can be re-suggested without re-uploading. Suggestions only — nothing is saved here.
@@ -8,7 +8,7 @@ import { db } from '../../../database/client'
 import { questions } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { ClaudeAuthError, ClaudeGradingError, type SuggestionImage } from '../../../utils/claude-cli'
-import { imageFromStoredPath, imageFromUpload, suggestTagIdsForImages } from '../../../utils/tag-suggestions'
+import { imageFromStoredPath, imageFromUpload, suggestForImages } from '../../../utils/tag-suggestions'
 
 const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    return { tagIds: await suggestTagIdsForImages(subjectId, images) }
+    return await suggestForImages(subjectId, images)
   } catch (err) {
     if (err instanceof ClaudeAuthError) throw createError({ statusCode: 503, statusMessage: 'Claude needs re-authentication — see the banner on the admin dashboard' })
     if (err instanceof ClaudeGradingError) throw createError({ statusCode: 502, statusMessage: 'Tag suggestion failed — try again' })

@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import sharp from 'sharp'
 import { db } from '../database/client'
 import { questions, questionTags, subjects, subjectTags } from '../database/schema'
-import { suggestTagNames, type SuggestionImage } from './claude-cli'
+import { suggestTagsAndDifficulty, type SuggestionImage } from './claude-cli'
 import { resolveSafeUploadPath } from './uploads'
 
 // Downscales before sending — a full-resolution scan costs far more tokens than it adds accuracy.
@@ -28,21 +28,21 @@ export async function imageFromStoredPath(label: string, relativePath: string | 
   return data ? toSuggestionImage(label, data) : null
 }
 
-// Asks Claude for tags and maps the answer back onto this subject's tag list (case-insensitive),
-// silently dropping anything not on it — so a suggestion can never break the "tags come from the
-// question's own subject" rule. Returns [] without calling Claude when the subject has no tags.
-export async function suggestTagIdsForImages(subjectId: number, images: SuggestionImage[]): Promise<number[]> {
-  if (images.length === 0) return []
+// Asks Claude for tags and a 1–5 difficulty. Tags are mapped back onto this subject's tag list
+// (case-insensitive), silently dropping anything not on it — so a suggestion can never break the
+// "tags come from the question's own subject" rule. Claude is still asked when the subject has no
+// tags, for the difficulty.
+export async function suggestForImages(subjectId: number, images: SuggestionImage[]): Promise<{ tagIds: number[], difficulty: number | null }> {
+  if (images.length === 0) return { tagIds: [], difficulty: null }
   const tags = await db.select({ id: subjectTags.id, name: subjectTags.name }).from(subjectTags)
     .where(eq(subjectTags.subjectId, subjectId))
-  if (tags.length === 0) return []
 
   const [subject] = await db.select({ name: subjects.name }).from(subjects).where(eq(subjects.id, subjectId)).limit(1)
-  const names = await suggestTagNames(images, tags.map(t => t.name), subject?.name ?? 'exam')
+  const suggestion = await suggestTagsAndDifficulty(images, tags.map(t => t.name), subject?.name ?? 'exam')
 
   const idByName = new Map(tags.map(t => [t.name.toLowerCase(), t.id]))
-  const ids = names.map(n => idByName.get(n.trim().toLowerCase())).filter((id): id is number => id !== undefined)
-  return [...new Set(ids)]
+  const ids = suggestion.tags.map(n => idByName.get(n.trim().toLowerCase())).filter((id): id is number => id !== undefined)
+  return { tagIds: [...new Set(ids)], difficulty: suggestion.difficulty }
 }
 
 async function imagesForQuestion(question: typeof questions.$inferSelect) {
@@ -56,9 +56,11 @@ async function imagesForQuestion(question: typeof questions.$inferSelect) {
 
 // --- Background queue (bulk import) ---
 //
-// One Claude call takes several seconds, so bulk-imported questions are tagged after the import
-// request has returned: rows are marked 'pending' and a single in-process worker drains them one
-// at a time. State lives on the row, not in memory, so a restart just resumes the queue.
+// One Claude call takes several seconds, so bulk-imported questions are tagged and rated after
+// the import request has returned: rows are marked 'pending' and a single in-process worker
+// drains them one at a time. State lives on the row, not in memory, so a restart just resumes the
+// queue. The worker only fills gaps — tags if the question has none, difficulty if it's unset —
+// so anything an admin set (by CSV or by hand while it waited) is never overwritten.
 
 let draining = false
 
@@ -80,11 +82,15 @@ export async function drainAutoTagQueue() {
       if (!question) break
 
       try {
-        const tagIds = await suggestTagIdsForImages(question.subjectId, await imagesForQuestion(question))
-        // Adds to whatever the question has now — an admin may have tagged it by hand while it
-        // waited in the queue, and those choices are kept.
-        if (tagIds.length > 0) {
+        const { tagIds, difficulty } = await suggestForImages(question.subjectId, await imagesForQuestion(question))
+        const [existingTag] = await db.select({ tagId: questionTags.tagId }).from(questionTags)
+          .where(eq(questionTags.questionId, question.id)).limit(1)
+        if (tagIds.length > 0 && !existingTag) {
           await db.insert(questionTags).values(tagIds.map(tagId => ({ questionId: question.id, tagId }))).onConflictDoNothing()
+        }
+        if (difficulty !== null) {
+          await db.update(questions).set({ difficulty })
+            .where(and(eq(questions.id, question.id), isNull(questions.difficulty)))
         }
         await db.update(questions).set({ autoTagStatus: 'done' })
           .where(and(eq(questions.id, question.id), eq(questions.autoTagStatus, 'pending')))

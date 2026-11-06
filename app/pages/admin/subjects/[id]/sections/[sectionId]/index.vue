@@ -239,11 +239,11 @@ function correctOption(question: Question) {
               name="i-lucide-loader-circle"
               class="animate-spin"
             />
-            Suggesting tags · {{ pendingAutoTagCount }} left
+            Suggesting tags and difficulty · {{ pendingAutoTagCount }} left
           </span>
           <UButton
             v-if="failedAutoTagIds.length"
-            :label="`Retry tagging (${failedAutoTagIds.length} failed)`"
+            :label="`Retry suggestions (${failedAutoTagIds.length} failed)`"
             icon="i-lucide-rotate-ccw"
             variant="ghost"
             color="warning"
@@ -323,14 +323,14 @@ function correctOption(question: Question) {
                   name="i-lucide-sparkles"
                   class="animate-pulse"
                 />
-                Suggesting tags…
+                Suggesting tags and difficulty…
               </p>
               <p
                 v-else-if="question.autoTagStatus === 'failed'"
                 class="mt-1 flex items-center gap-1 text-xs text-warning"
               >
                 <UIcon name="i-lucide-triangle-alert" />
-                Tag suggestion failed
+                Suggestion failed
               </p>
               <div
                 v-if="question.tagIds.length"

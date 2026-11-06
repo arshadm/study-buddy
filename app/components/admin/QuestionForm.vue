@@ -95,19 +95,22 @@ watch(tagSubjectId, id => loadTags(id))
 
 const tagItems = computed(() => subjectTags.value.map(t => ({ label: t.name, value: t.id })))
 
-// Claude tag suggestions: run automatically when a question image is chosen, or on demand.
-// Suggestions are merged into the selection for the admin to review — nothing is saved until
-// "Save question".
+// Claude suggestions (tags + difficulty): run automatically when a question image is chosen, or
+// on demand. Tags are merged into the selection and difficulty only fills an unset dropdown, for
+// the admin to review — nothing is saved until "Save question".
 const suggestingTags = ref(false)
 const suggestMessage = ref('')
 const suggestError = ref('')
-const canSuggestTags = computed(() => Boolean(tagSubjectId.value) && subjectTags.value.length > 0 && (Boolean(imageFile.value) || Boolean(props.question)))
+const difficultyMessage = ref('')
+const canSuggest = computed(() => Boolean(tagSubjectId.value) && (Boolean(imageFile.value) || Boolean(props.question)))
+const canSuggestTags = computed(() => canSuggest.value && subjectTags.value.length > 0)
 
 async function suggestTags() {
-  if (!canSuggestTags.value || suggestingTags.value) return
+  if (!canSuggest.value || suggestingTags.value) return
   suggestingTags.value = true
   suggestMessage.value = ''
   suggestError.value = ''
+  difficultyMessage.value = ''
   const formData = new FormData()
   formData.set('subjectId', String(tagSubjectId.value))
   if (props.question) formData.set('questionId', String(props.question.id))
@@ -115,15 +118,27 @@ async function suggestTags() {
   if (workedSolutionFile.value) formData.set('workedSolutionImage', workedSolutionFile.value)
   if (markSchemeFile.value) formData.set('markSchemeImage', markSchemeFile.value)
   try {
-    const { tagIds: suggested } = await $fetch<{ tagIds: number[] }>('/api/admin/questions/suggest-tags', { method: 'POST', body: formData })
-    const added = suggested.filter(id => !tagIds.value.includes(id))
-    tagIds.value = [...tagIds.value, ...added]
-    const nameOf = (id: number) => subjectTags.value.find(t => t.id === id)?.name ?? '?'
-    suggestMessage.value = suggested.length === 0
-      ? 'Claude didn\'t find a matching tag in this subject\'s list.'
-      : `Claude suggested: ${suggested.map(nameOf).join(', ')}${added.length < suggested.length ? ' (some were already selected)' : ''} — review before saving.`
+    const { tagIds: suggested, difficulty: suggestedDifficulty } = await $fetch<{ tagIds: number[], difficulty: number | null }>('/api/admin/questions/suggest-tags', { method: 'POST', body: formData })
+    if (subjectTags.value.length > 0) {
+      const added = suggested.filter(id => !tagIds.value.includes(id))
+      tagIds.value = [...tagIds.value, ...added]
+      const nameOf = (id: number) => subjectTags.value.find(t => t.id === id)?.name ?? '?'
+      suggestMessage.value = suggested.length === 0
+        ? 'Claude didn\'t find a matching tag in this subject\'s list.'
+        : `Claude suggested: ${suggested.map(nameOf).join(', ')}${added.length < suggested.length ? ' (some were already selected)' : ''} — review before saving.`
+    }
+    if (suggestedDifficulty !== null) {
+      if (difficulty.value) {
+        difficultyMessage.value = suggestedDifficulty === difficulty.value
+          ? `Claude agrees: ${suggestedDifficulty}.`
+          : `Claude suggested ${suggestedDifficulty} — kept your ${difficulty.value}.`
+      } else {
+        difficulty.value = suggestedDifficulty
+        difficultyMessage.value = `Claude suggested ${suggestedDifficulty} — review before saving.`
+      }
+    }
   } catch (err) {
-    suggestError.value = apiErrorMessage(err, 'Could not suggest tags')
+    suggestError.value = apiErrorMessage(err, 'Could not get suggestions')
   } finally {
     suggestingTags.value = false
   }
@@ -330,12 +345,43 @@ async function onSubmit() {
     </UFormField>
 
     <UFormField label="Difficulty">
-      <USelectMenu
-        v-model="difficulty"
-        :items="difficultyItems"
-        value-key="value"
-        class="w-full sm:w-64"
-      />
+      <div class="space-y-2">
+        <div class="flex gap-2">
+          <USelectMenu
+            v-model="difficulty"
+            :items="difficultyItems"
+            value-key="value"
+            class="w-full sm:w-64"
+          />
+          <UButton
+            label="Suggest"
+            icon="i-lucide-sparkles"
+            variant="subtle"
+            color="neutral"
+            :loading="suggestingTags"
+            :disabled="!canSuggest"
+            @click="suggestTags"
+          />
+        </div>
+        <p
+          v-if="suggestingTags"
+          class="text-sm text-muted"
+        >
+          Asking Claude…
+        </p>
+        <p
+          v-else-if="difficultyMessage"
+          class="text-sm text-muted"
+        >
+          {{ difficultyMessage }}
+        </p>
+        <p
+          v-if="suggestError && !tagItems.length"
+          class="text-sm text-error"
+        >
+          {{ suggestError }}
+        </p>
+      </div>
     </UFormField>
 
     <UFormField label="Question type">
@@ -431,7 +477,7 @@ async function onSubmit() {
           v-if="suggestingTags"
           class="text-sm text-muted"
         >
-          Asking Claude for tags…
+          Asking Claude for tags and difficulty…
         </p>
         <p
           v-else-if="suggestMessage"
