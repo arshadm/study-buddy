@@ -279,11 +279,11 @@ export interface QuestionSuggestion {
 // Anchored scale — without fixed descriptions per level, ratings bunch up around 3. Kept in sync
 // with the 1–5 options in the admin question form.
 const DIFFICULTY_SCALE = [
-  '1 — a single routine step: direct recall, substitution or one standard rule.',
+  '1 — a single routine step: direct recall, substitution or one standard rule; the opening questions of a paper.',
   '2 — a standard textbook exercise: 2–3 steps with an obvious method.',
   '3 — multi-step or combines two ideas; the typical mid-paper exam question.',
-  '4 — the method must be chosen, the setting is unfamiliar, or the working is long; late in a paper.',
-  '5 — among the hardest questions in such an exam: proof, genuine insight, or long chains of reasoning across parts.'
+  '4 — the method must be chosen, the setting is unfamiliar, or the working is long; the harder questions in the second half of a paper.',
+  '5 — the hardest questions a student at this level meets: typically the last, highest-mark question of a paper, a proof, or a question that needs genuine insight. Most papers have one or two.'
 ]
 
 export function buildSuggestionPrompt(images: SuggestionImage[], tagNames: string[], subjectName: string): string {
@@ -304,7 +304,9 @@ export function buildSuggestionPrompt(images: SuggestionImage[], tagNames: strin
     '## Difficulty',
     `Rate how hard the question is for a student taking "${subjectName}", judged against that level — not against harder or easier qualifications. Use the whole scale:`,
     ...DIFFICULTY_SCALE.map(l => `- ${l}`),
-    'Use the marks available, the length of the worked solution and mark scheme, and how much of the method the question gives away as evidence. For a multi-part question, rate the question as a whole, leaning towards its hardest part.'
+    'Use the marks available, the length of the worked solution and mark scheme, and how much of the method the question gives away as evidence. For a multi-part question, rate the question as a whole, leaning towards its hardest part.',
+    'In a multiple-choice test every question carries the same marks, so judge by the reasoning needed instead.',
+    'Across a whole paper expect a few 1s, mostly 2s and 3s, several 4s and one or two 5s. Do not hold back on 4 and 5: they mean the hardest questions at this level, not questions beyond it.'
   ].join('\n')
 }
 
