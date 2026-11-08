@@ -3,7 +3,8 @@ import { db } from '../../../database/client'
 import { questions, questionOptions, sections } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage, deleteQuestionImage } from '../../../utils/uploads'
-import { parseQuestionType, parseOptionFormat, parseCorrectAnswerText, parseDifficulty } from '../../../utils/question-validation'
+import { parseQuestionType, parseOptionFormat, parseCorrectAnswerText, parseDifficulty, parseDifficultyScore, parseDifficultyAuto } from '../../../utils/question-validation'
+import { rebandSubject } from '../../../utils/difficulty-bands'
 import { buildQuestionOptions } from '../../../utils/build-question-options'
 import { assertTagsBelongToSubject, dropTagsOutsideSubject, getTagIdsByQuestion, parseTagIdsField, setQuestionTags } from '../../../utils/subject-tags'
 
@@ -35,7 +36,12 @@ export default defineEventHandler(async (event) => {
   if (tagIds) await assertTagsBelongToSubject(resolvedSubjectId, tagIds)
 
   if ('hintText' in fields) updates.hintText = fields.hintText || null
-  if ('difficulty' in fields) updates.difficulty = parseDifficulty(fields)
+  const difficultyScore = parseDifficultyScore(fields)
+  if (difficultyScore !== null) updates.difficultyScore = difficultyScore
+  if ('difficulty' in fields) {
+    updates.difficulty = parseDifficulty(fields)
+    updates.difficultyAuto = parseDifficultyAuto(fields, updates.difficulty, difficultyScore ?? existing.difficultyScore)
+  }
 
   const resolvedType = fields.type ? parseQuestionType(fields) : existing.type
   let newOptions: ReturnType<typeof buildQuestionOptions> | null = null
@@ -93,6 +99,11 @@ export default defineEventHandler(async (event) => {
 
   if (tagIds) setQuestionTags(id, tagIds)
   else if (resolvedSubjectId !== existing.subjectId) await dropTagsOutsideSubject(id, resolvedSubjectId)
+
+  if (difficultyScore !== null || existing.difficultyScore !== null) {
+    await rebandSubject(resolvedSubjectId)
+    if (resolvedSubjectId !== existing.subjectId) await rebandSubject(existing.subjectId)
+  }
 
   let oldOptions: { optionImagePath: string | null }[] = []
   if (newOptions || clearOptions) {

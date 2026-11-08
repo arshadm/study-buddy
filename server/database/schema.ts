@@ -112,7 +112,14 @@ export const questions = sqliteTable('questions', {
   // or a manual retry. Null = never queued. 'pending' rows are picked up again on startup, so a
   // redeploy mid-batch doesn't lose them.
   autoTagStatus: text('auto_tag_status', { enum: ['pending', 'done', 'failed'] }),
+  // 1–5, used by the question picker. Either set by an admin, or (difficultyAuto) derived from
+  // Claude's difficultyScore by ranking it within the subject — see server/utils/difficulty-bands.ts.
   difficulty: integer('difficulty'),
+  // Claude's raw 1–100 rating. Only meaningful relative to the subject's other scores.
+  difficultyScore: integer('difficulty_score'),
+  // True when `difficulty` came from Claude and may be re-banded as the subject's scores change;
+  // false once an admin picks a value, which is then never overwritten.
+  difficultyAuto: integer('difficulty_auto', { mode: 'boolean' }).notNull().default(false),
   type: text('type', { enum: ['multiple_choice', 'self_marked_image'] }).notNull().default('multiple_choice'),
   // Only meaningful when type is 'multiple_choice' — 'text' carries question_options rows,
   // 'image' means the single question image already shows the options, and the correct

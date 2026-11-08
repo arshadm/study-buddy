@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    return await suggestForImages(subjectId, images)
+    return await suggestForImages(subjectId, images, existing?.id)
   } catch (err) {
     if (err instanceof ClaudeAuthError) throw createError({ statusCode: 503, statusMessage: 'Claude needs re-authentication — see the banner on the admin dashboard' })
     if (err instanceof ClaudeGradingError) throw createError({ statusCode: 502, statusMessage: 'Tag suggestion failed — try again' })

@@ -3,7 +3,8 @@ import { db } from '../../../database/client'
 import { questions, questionOptions, sections } from '../../../database/schema'
 import { parseMultipartForm } from '../../../utils/multipart'
 import { saveQuestionImage } from '../../../utils/uploads'
-import { parseQuestionType, parseOptionFormat, parseCorrectAnswerText, parseDifficulty } from '../../../utils/question-validation'
+import { parseQuestionType, parseOptionFormat, parseCorrectAnswerText, parseDifficulty, parseDifficultyScore, parseDifficultyAuto } from '../../../utils/question-validation'
+import { rebandSubject } from '../../../utils/difficulty-bands'
 import { buildQuestionOptions } from '../../../utils/build-question-options'
 import { assertTagsBelongToSubject, parseTagIdsField, setQuestionTags } from '../../../utils/subject-tags'
 
@@ -32,6 +33,7 @@ export default defineEventHandler(async (event) => {
 
   const type = parseQuestionType(fields)
   const difficulty = parseDifficulty(fields)
+  const difficultyScore = parseDifficultyScore(fields)
   const optionFormat = type === 'multiple_choice' ? parseOptionFormat(fields) : 'text'
 
   let options: ReturnType<typeof buildQuestionOptions> = []
@@ -57,6 +59,8 @@ export default defineEventHandler(async (event) => {
     markSchemeImagePath,
     hintText: fields.hintText || null,
     difficulty,
+    difficultyScore,
+    difficultyAuto: parseDifficultyAuto(fields, difficulty, difficultyScore),
     type,
     optionFormat,
     correctAnswerText,
@@ -82,5 +86,10 @@ export default defineEventHandler(async (event) => {
 
   if (tagIds.length > 0) setQuestionTags(question.id, tagIds)
 
+  if (difficultyScore !== null) {
+    await rebandSubject(subjectId)
+    const [rebanded] = await db.select().from(questions).where(eq(questions.id, question.id)).limit(1)
+    return { ...rebanded!, tagIds }
+  }
   return { ...question, tagIds }
 })

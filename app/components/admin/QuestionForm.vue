@@ -13,6 +13,7 @@ interface ExistingQuestion {
   markSchemeImagePath: string | null
   hintText: string | null
   difficulty: number | null
+  difficultyAuto?: boolean
   type: 'multiple_choice' | 'self_marked_image'
   optionFormat: 'text' | 'image'
   correctAnswerText: string | null
@@ -102,6 +103,13 @@ const suggestingTags = ref(false)
 const suggestMessage = ref('')
 const suggestError = ref('')
 const difficultyMessage = ref('')
+// Claude's latest suggestion. Its raw score is saved with the question so the difficulty can be
+// re-ranked within the subject later, as long as the admin keeps Claude's value.
+const suggestedDifficulty = ref<number | null>(null)
+const suggestedScore = ref<number | null>(null)
+const difficultyIsClaudes = computed(() => difficulty.value !== undefined && (
+  (Boolean(props.question?.difficultyAuto) && difficulty.value === props.question?.difficulty)
+  || difficulty.value === suggestedDifficulty.value))
 const canSuggest = computed(() => Boolean(tagSubjectId.value) && (Boolean(imageFile.value) || Boolean(props.question)))
 const canSuggestTags = computed(() => canSuggest.value && subjectTags.value.length > 0)
 
@@ -118,7 +126,7 @@ async function suggestTags() {
   if (workedSolutionFile.value) formData.set('workedSolutionImage', workedSolutionFile.value)
   if (markSchemeFile.value) formData.set('markSchemeImage', markSchemeFile.value)
   try {
-    const { tagIds: suggested, difficulty: suggestedDifficulty } = await $fetch<{ tagIds: number[], difficulty: number | null }>('/api/admin/questions/suggest-tags', { method: 'POST', body: formData })
+    const { tagIds: suggested, difficulty: suggestion, difficultyScore } = await $fetch<{ tagIds: number[], difficulty: number | null, difficultyScore: number | null }>('/api/admin/questions/suggest-tags', { method: 'POST', body: formData })
     if (subjectTags.value.length > 0) {
       const added = suggested.filter(id => !tagIds.value.includes(id))
       tagIds.value = [...tagIds.value, ...added]
@@ -127,14 +135,17 @@ async function suggestTags() {
         ? 'Claude didn\'t find a matching tag in this subject\'s list.'
         : `Claude suggested: ${suggested.map(nameOf).join(', ')}${added.length < suggested.length ? ' (some were already selected)' : ''} — review before saving.`
     }
-    if (suggestedDifficulty !== null) {
-      if (difficulty.value) {
-        difficultyMessage.value = suggestedDifficulty === difficulty.value
-          ? `Claude agrees: ${suggestedDifficulty}.`
-          : `Claude suggested ${suggestedDifficulty} — kept your ${difficulty.value}.`
+    if (suggestion !== null) {
+      const replaceable = !difficulty.value || difficultyIsClaudes.value
+      suggestedDifficulty.value = suggestion
+      suggestedScore.value = difficultyScore
+      if (!replaceable) {
+        difficultyMessage.value = suggestion === difficulty.value
+          ? `Claude agrees: ${suggestion}.`
+          : `Claude suggested ${suggestion} — kept your ${difficulty.value}.`
       } else {
-        difficulty.value = suggestedDifficulty
-        difficultyMessage.value = `Claude suggested ${suggestedDifficulty} — review before saving.`
+        difficulty.value = suggestion
+        difficultyMessage.value = `Claude suggested ${suggestion} — review before saving.`
       }
     }
   } catch (err) {
@@ -250,6 +261,8 @@ async function onSubmit() {
   formData.set('type', type.value)
   if (difficulty.value) formData.set('difficulty', String(difficulty.value))
   else formData.set('difficulty', '')
+  if (suggestedScore.value !== null) formData.set('difficultyScore', String(suggestedScore.value))
+  formData.set('difficultyAuto', String(difficultyIsClaudes.value))
 
   if (type.value === 'multiple_choice') {
     formData.set('optionFormat', optionFormat.value)
@@ -374,6 +387,12 @@ async function onSubmit() {
           class="text-sm text-muted"
         >
           {{ difficultyMessage }}
+        </p>
+        <p
+          v-if="!suggestingTags && difficultyIsClaudes"
+          class="text-xs text-muted"
+        >
+          Claude's rating, ranked against this subject's other questions — it can shift as questions are added. Choose a different value to fix it.
         </p>
         <p
           v-if="suggestError && !tagItems.length"

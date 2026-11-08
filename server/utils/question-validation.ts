@@ -36,3 +36,19 @@ export function parseDifficulty(fields: Record<string, string>): number | null {
   }
   return value
 }
+
+// Sent by the question form alongside difficulty when Claude suggested it: the raw 1–100 score,
+// and whether the chosen difficulty is still Claude's (so it may be re-banded later).
+export function parseDifficultyScore(fields: Record<string, string>): number | null {
+  if (!fields.difficultyScore) return null
+  const value = Number(fields.difficultyScore)
+  if (!Number.isInteger(value) || value < 1 || value > 100) {
+    throw createError({ statusCode: 400, statusMessage: 'Difficulty score must be an integer between 1 and 100' })
+  }
+  return value
+}
+
+// A cleared difficulty with a score is left for re-banding to fill in.
+export function parseDifficultyAuto(fields: Record<string, string>, difficulty: number | null, score: number | null): boolean {
+  return difficulty === null ? score !== null : fields.difficultyAuto === 'true'
+}

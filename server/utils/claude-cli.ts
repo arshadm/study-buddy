@@ -260,30 +260,32 @@ const SUGGESTION_SCHEMA = JSON.stringify({
   type: 'object',
   properties: {
     tags: { type: 'array', items: { type: 'string' } },
-    difficulty: { type: 'integer', minimum: 1, maximum: 5 }
+    difficulty_score: { type: 'integer', minimum: 1, maximum: 100 }
   },
-  required: ['tags', 'difficulty'],
+  required: ['tags', 'difficulty_score'],
   additionalProperties: false
 })
 
 const suggestionSchema = z.object({
   tags: z.array(z.string()),
-  difficulty: z.number().int().min(1).max(5)
+  difficulty_score: z.number().int().min(1).max(100)
 })
 
 export interface QuestionSuggestion {
   tags: string[]
-  difficulty: number
+  difficultyScore: number
 }
 
-// Anchored scale — without fixed descriptions per level, ratings bunch up around 3. Kept in sync
-// with the 1–5 options in the admin question form.
-const DIFFICULTY_SCALE = [
-  '1 — a single routine step: direct recall, substitution or one standard rule; the opening questions of a paper.',
-  '2 — a standard textbook exercise: 2–3 steps with an obvious method.',
-  '3 — multi-step or combines two ideas; the typical mid-paper exam question.',
-  '4 — the method must be chosen, the setting is unfamiliar, or the working is long; the harder questions in the second half of a paper.',
-  '5 — the hardest questions a student at this level meets: typically the last, highest-mark question of a paper, a proof, or a question that needs genuine insight. Most papers have one or two.'
+// Asked on 1–5 directly, Claude bunched almost everything at 2–3 and never used 5, however the
+// levels were worded. So it gives a fine-grained score instead, and the app turns scores into
+// 1–5 by rank within each subject (server/utils/difficulty-bands.ts). The anchors still keep
+// scores comparable between calls, which is what makes the ranking meaningful.
+const DIFFICULTY_ANCHORS = [
+  '1–20 — a single routine step: direct recall, substitution or one standard rule.',
+  '21–40 — a standard textbook exercise: 2–3 steps with an obvious method.',
+  '41–60 — multi-step or combines two ideas; the typical mid-paper exam question.',
+  '61–80 — the method must be chosen, the setting is unfamiliar, or the working is long.',
+  '81–100 — the hardest questions a student at this level meets: a paper\'s last, highest-mark question, a proof, or a question that needs genuine insight.'
 ]
 
 export function buildSuggestionPrompt(images: SuggestionImage[], tagNames: string[], subjectName: string): string {
@@ -302,11 +304,10 @@ export function buildSuggestionPrompt(images: SuggestionImage[], tagNames: strin
       : ['This subject has no tag list — return an empty list.']),
     '',
     '## Difficulty',
-    `Rate how hard the question is for a student taking "${subjectName}", judged against that level — not against harder or easier qualifications. Use the whole scale:`,
-    ...DIFFICULTY_SCALE.map(l => `- ${l}`),
-    'Use the marks available, the length of the worked solution and mark scheme, and how much of the method the question gives away as evidence. For a multi-part question, rate the question as a whole, leaning towards its hardest part.',
-    'In a multiple-choice test every question carries the same marks, so judge by the reasoning needed instead.',
-    'Across a whole paper expect a few 1s, mostly 2s and 3s, several 4s and one or two 5s. Do not hold back on 4 and 5: they mean the hardest questions at this level, not questions beyond it.'
+    `Score how hard the question is for a student taking "${subjectName}", from 1 (easiest) to 100 (hardest), judged against that level — not against harder or easier qualifications. Scores are used to rank questions against each other, so be precise: any whole number, not just round ones. Rough guide:`,
+    ...DIFFICULTY_ANCHORS.map(l => `- ${l}`),
+    'Use the marks available, the length of the worked solution and mark scheme, and how much of the method the question gives away as evidence. For a multi-part question, score the question as a whole, leaning towards its hardest part.',
+    'In a multiple-choice test every question carries the same marks, so judge by the reasoning needed instead.'
   ].join('\n')
 }
 
@@ -395,8 +396,10 @@ async function withRetryAndAuthStatus<T>(run: () => Promise<T>): Promise<T> {
 // Tag names come back exactly as Claude wrote them; the caller maps them back onto the subject's
 // tag list and drops anything that isn't on it.
 export async function suggestTagsAndDifficulty(images: SuggestionImage[], tagNames: string[], subjectName: string): Promise<QuestionSuggestion> {
-  return withRetryAndAuthStatus(async () =>
-    suggestionSchema.parse(await runImagePromptOnce(images, buildSuggestionPrompt(images, tagNames, subjectName), SUGGESTION_SCHEMA)))
+  return withRetryAndAuthStatus(async () => {
+    const result = suggestionSchema.parse(await runImagePromptOnce(images, buildSuggestionPrompt(images, tagNames, subjectName), SUGGESTION_SCHEMA))
+    return { tags: result.tags, difficultyScore: result.difficulty_score }
+  })
 }
 
 // --- Step-by-step explanations ---
